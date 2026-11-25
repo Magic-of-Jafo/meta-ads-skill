@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+meta-ads-output/
+inventory.json
+inventory.md
+.DS_Store
+Thumbs.db
+
+# private planning notes
+STRATEGY.md

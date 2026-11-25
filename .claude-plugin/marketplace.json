@@ -1,0 +1,14 @@
+{
+  "name": "meta-ads-skill",
+  "description": "Marketplace for the meta-ads Claude Code skill: Facebook and Instagram ad mockups across 15 placements.",
+  "owner": { "name": "Magic-of-Jafo", "url": "https://github.com/Magic-of-Jafo" },
+  "plugins": [
+    {
+      "name": "meta-ads",
+      "source": "./",
+      "description": "Render realistic in-situ mockups of Facebook and Instagram ads across 15 placements, as a local HTML viewer plus PNGs.",
+      "version": "1.0.0",
+      "category": "marketing"
+    }
+  ]
+}
