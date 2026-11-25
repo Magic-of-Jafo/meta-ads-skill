@@ -378,6 +378,14 @@ function readHash(){
     else if (k in state) state[k] = v;
   }
   if (state.export) { state.badges = q.get("badges") === "1"; }
+  // Old or hand-edited links must not leave a view silently empty: drop values this data doesn't have.
+  if (state.status === "ready") state.status = "actual";               // renamed in v1.1.0
+  if (!["", "actual", "simulated"].includes(state.status)) state.status = "";
+  if (!["feed", "compare", "gallery", "matrix"].includes(state.mode)) state.mode = "feed";
+  if (!P[state.pl]) state.pl = P.fb_feed_mobile ? "fb_feed_mobile" : D.placements[0].id;
+  if (state.ad && !AD[state.ad]) state.ad = D.ads[0]?.id;
+  if (state.group && !D.ads.some(a => a.group === state.group)) state.group = "";
+  if (state.brand && !D.ads.some(a => a.brand === state.brand)) state.brand = "";
 }
 function writeHash(){
   if (state.export) return;
@@ -809,7 +817,7 @@ function viewGallery(){
     if (!html) { skipped.push(`${p.name} (${c.reasons[0] || c.status})`); continue; }
     parts.push(tileHtml(esc(p.name), c, html, Math.round(widthOf(p) * state.zoom)));
   }
-  return `<p class="summary">${esc(ad.id)}${ad.label ? " — " + esc(ad.label) : ""} · ${ad.format} · ${esc(brandOf(ad).page_name)}${ad.group ? " · group " + esc(ad.group) : ""}${skipped.length ? ` · not shown: ${esc(skipped.join(", "))}` : ""}</p><div class="tiles">${parts.join("")}</div>`;
+  return `<p class="summary">${esc(ad.id)}${ad.label ? " — " + esc(ad.label) : ""} · ${ad.format} · ${esc(brandOf(ad).page_name)}${ad.group ? " · group " + esc(ad.group) : ""}${skipped.length ? ` · not shown: ${esc(skipped.join(", "))}` : ""}</p>${parts.length ? `<div class="tiles">${parts.join("")}</div>` : `<div class="empty">${state.status ? `No ${esc(state.status)} mockups for this ad. Set the status filter to "Any status" to see them all.` : "No placement can show this ad."}</div>`}`;
 }
 function viewCompare(){
   const p = P[state.pl];
