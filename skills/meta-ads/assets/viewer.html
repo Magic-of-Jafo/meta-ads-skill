@@ -366,7 +366,7 @@ const ic = {
 };
 
 /* ------------------------------------------------------------------ state */
-const state = {mode:"gallery", ad:D.ads[0]?.id, pl:"fb_feed_mobile", group:"", brand:"", status:"", safe:false, trunc:false, badges:true, frame:false, dark:false, zoom:0.8, thumbs:false, card:0, export:false};
+const state = {mode:"feed", ad:D.ads[0]?.id, pl:"fb_feed_mobile", group:"", brand:"", status:"", safe:false, trunc:false, badges:true, frame:false, dark:false, zoom:0.8, thumbs:false, card:0, export:false};
 function readHash(){
   const h = location.hash.replace(/^#/, "");
   const q = new URLSearchParams(h.replace(/^export&?/, ""));
@@ -855,7 +855,7 @@ function go(){
   document.documentElement.dataset.theme = state.dark ? "dark" : "light";
   toolbar();
   const main = $("#main");
-  main.innerHTML = ({gallery: viewGallery, compare: viewCompare, feed: viewFeed, matrix: viewMatrix}[state.mode] || viewGallery)();
+  main.innerHTML = ({gallery: viewGallery, compare: viewCompare, feed: viewFeed, matrix: viewMatrix}[state.mode] || viewFeed)();
   clampAll(main);
   if (state.mode === "matrix") {
     main.querySelectorAll("[data-go]").forEach(td => td.onclick = () => { const [a, p] = td.dataset.go.split("|"); state.ad = a; state.pl = p; state.mode = "compare"; state.group = AD[a].group || ""; go(); });
