@@ -545,7 +545,7 @@ function igActions(e, dots){
 function organicIG(i){
   const o = ORG[i % ORG.length];
   const h = o.n.toLowerCase().replace(/\s/g, "_");
-  return `<div class="igpost"><div class="h"><div class="av" style="width:32px;height:32px;font-size:12px;background:${hueFor(o.n)}">${initials(o.n)}</div><div class="who"><div class="nm">${h}</div></div>${ic.dots(18)}</div>
+  return `<div class="igpost organic"><div class="h"><div class="av" style="width:32px;height:32px;font-size:12px;background:${hueFor(o.n)}">${initials(o.n)}</div><div class="who"><div class="nm">${h}</div></div>${ic.dots(18)}</div>
   <div class="media" style="aspect-ratio:${o.r==="1:1"?1:.8};background:${o.c}"></div>
   ${igActions({likes: 842 + i*311, comments: 14 + i*9, shares: 3 + i})}
   <div class="igcap"><b>${h}</b> ${esc(o.t)}</div><div class="igtime">${3+i} hours ago</div></div>`;
@@ -857,6 +857,7 @@ function go(){
   const main = $("#main");
   main.innerHTML = ({gallery: viewGallery, compare: viewCompare, feed: viewFeed, matrix: viewMatrix}[state.mode] || viewFeed)();
   clampAll(main);
+  if (state.mode === "feed") revealFeedAd(main);
   if (state.mode === "matrix") {
     main.querySelectorAll("[data-go]").forEach(td => td.onclick = () => { const [a, p] = td.dataset.go.split("|"); state.ad = a; state.pl = p; state.mode = "compare"; state.group = AD[a].group || ""; go(); });
     const io = new IntersectionObserver(es => es.forEach(en => {
@@ -867,6 +868,20 @@ function go(){
       clampAll(el); io.unobserve(el);
     }), {rootMargin: "300px"});
     main.querySelectorAll("[data-lazy]").forEach(el => io.observe(el));
+  }
+}
+/* In-feed mode opens with the ad on screen: scroll so it starts a little below the
+   sticky header, leaving the end of the organic post above it visible. */
+function revealFeedAd(main){
+  const org = main.querySelector(".organic"), ad = org && org.nextElementSibling;
+  if (!ad || ad.classList.contains("organic")) return;
+  let box = ad.parentElement;
+  while (box && box !== main && !(/(auto|scroll)/.test(getComputedStyle(box).overflowY) && box.scrollHeight > box.clientHeight)) box = box.parentElement;
+  if (box && box !== main) {
+    const br = box.getBoundingClientRect(), k = br.height / box.clientHeight || 1;   // CSS zoom factor
+    box.scrollTop += (ad.getBoundingClientRect().top - br.top) / k - 230;
+  } else {
+    window.scrollBy(0, ad.getBoundingClientRect().top - 160);
   }
 }
 function exportView(){
