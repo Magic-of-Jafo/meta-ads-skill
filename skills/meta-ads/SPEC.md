@@ -8,10 +8,10 @@ Contents: [1 Workflow](#1-workflow) · [2 File](#2-file-and-paths) · [3 Top lev
 
 `<skill-dir>` below is the folder that contains this SPEC.md and SKILL.md.
 
-1. Write `ads.json` (anywhere; a work folder is fine) and make sure every media file it points to exists on disk.
+1. Write `ads.json` and make sure every media file it points to exists on disk. Normally it lives in a library, `meta-ads/<library>/ads.json` with media in `meta-ads/<library>/assets/` (create one with `python <skill-dir>/scripts/library.py new "Name"`; SKILL.md has the layout). Anywhere else works for one-off renders.
 2. `python <skill-dir>/scripts/check.py ads.json`. Fix every **error**; read the **warnings** and the **unlock** list.
 3. Decide with the user whether to supply missing items (copy, creative ratios, avatar) or render with placeholders as-is.
-4. `python <skill-dir>/scripts/render.py ads.json` writes `./meta-ads-output/<campaign>-<date>/` in your current working directory.
+4. `python <skill-dir>/scripts/render.py ads.json` writes the viewer to `<library>/viewer/` for a library spec, otherwise to `./meta-ads-output/<campaign>-<date>/` in your current working directory.
 5. Optional: `python <skill-dir>/scripts/export_png.py <that folder>` for PNGs.
 
 ## 2. File and paths
@@ -25,7 +25,7 @@ Contents: [1 Workflow](#1-workflow) · [2 File](#2-file-and-paths) · [3 Top lev
 | Field | Required | Meaning |
 |---|---|---|
 | `spec_version` | yes | `1` |
-| `campaign` | yes | `{ "name": "...", "notes": "..." }`. `name` names the output folder and the viewer title. |
+| `campaign` | yes | `{ "name": "...", "notes": "..." }`. `name` is the viewer title and, in a library, the library's display name (otherwise it also names the dated output folder). |
 | `brands` | yes, ≥1 | Map of brand ID → identity (§4). The first brand is the default for ads that don't name one. |
 | `media` | yes | Map of media ID → one image, video or placeholder (§5). May be `{}` only if every ad is invalid, so in practice ≥1. |
 | `defaults` | no | Any ad field except `id`, `label`, `source`, `notes`. Applied to every ad that omits that field. Good for `cta`, `destination_url`, `engagement`, `brand`. |

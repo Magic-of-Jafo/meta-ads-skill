@@ -3,8 +3,12 @@
 Usage:
     python render.py path/to/ads.json [--out DIR] [--open]
 
-Default output: ./meta-ads-output/<campaign-slug>-<YYYY-MM-DD>/ under the
-current working directory (the invoking agent's workspace). Each unique media
+If ads.json is in a library (meta-ads/<library>/ads.json, set up with library.py),
+the viewer goes to <library>/viewer/, re-rendering updates it in place, and the
+library root's home page and library list are refreshed.
+
+Otherwise the default output is ./meta-ads-output/<campaign-slug>-<YYYY-MM-DD>/ under
+the current working directory (the invoking agent's workspace). Each unique media
 file is stored once in media/, named by content hash, however many ads use it.
 Re-running into the same folder reuses media already there.
 """
@@ -23,6 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import metaads  # noqa: E402
+import library  # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -86,6 +91,30 @@ def make_poster(video_path, media_dir, sha):
     return None
 
 
+def first_thumb(ads, out_media):
+    """Path (relative to the viewer folder) of the first ad's picture, for the library home page."""
+    def ids(x):
+        if isinstance(x, dict):
+            for k, v in x.items():
+                if k == "creative" and isinstance(v, dict):
+                    yield from (v[r] for r in ("1:1", "4:5", "9:16", "1.91:1") if isinstance(v.get(r), str))
+                    yield from (m for m in v.values() if isinstance(m, str))
+                else:
+                    yield from ids(v)
+        elif isinstance(x, list):
+            for v in x:
+                yield from ids(v)
+    color = None
+    for ad in ads:
+        for mid in ids(ad):
+            m = out_media.get(mid) or {}
+            src = m.get("poster") if m.get("kind") == "video" else m.get("src")
+            if src:
+                return src, None
+            color = color or m.get("color")
+    return None, color
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("spec")
@@ -99,7 +128,13 @@ def main():
             print(f"ERROR {e['where']}: {e['message']}")
         sys.exit(1)
     name = (spec.get("campaign") or {}).get("name") if isinstance(spec.get("campaign"), dict) else None
-    out = Path(a.out) if a.out else Path.cwd() / "meta-ads-output" / f"{slug(name)}-{dt.date.today().isoformat()}"
+    lib_root = None if a.out else library.root_of(spec_path)
+    if a.out:
+        out = Path(a.out)
+    elif lib_root:
+        out = spec_path.parent / "viewer"
+    else:
+        out = Path.cwd() / "meta-ads-output" / f"{slug(name)}-{dt.date.today().isoformat()}"
     out = out.resolve()
     media_dir = out / "media"
     media_dir.mkdir(parents=True, exist_ok=True)
@@ -151,6 +186,10 @@ def main():
     # an earlier data.js (e.g. when served over http) can't show stale ads after a re-render.
     stamp = dt.datetime.now().strftime("%Y%m%d%H%M%S")
     html = VIEWER.read_text(encoding="utf-8").replace('<script src="data.js"></script>', f'<script src="data.js?v={stamp}"></script>', 1)
+    if lib_root:
+        # Tell the viewer it's in a library, so it can load the shared library list and show the switcher.
+        lib_id = spec_path.parent.name.replace('"', "")
+        html = html.replace('<meta charset="utf-8">', f'<meta charset="utf-8">\n<meta name="meta-ads-library" content="{lib_id}">', 1)
     (out / "index.html").write_text(html, encoding="utf-8", newline="")
     # Self-contained snapshot: same spec, media paths pointing at the stored copies, so the
     # output folder can be re-rendered or moved. The agent's working ads.json is never touched.
@@ -161,16 +200,26 @@ def main():
             if out_media[mid].get("poster"):
                 m["poster"] = out_media[mid]["poster"]
     snap_path = out / "ads.snapshot.json"
-    if snap_path.resolve() != spec_path.resolve():
+    if not lib_root and snap_path.resolve() != spec_path.resolve():  # a library's own ads.json already is that copy
         snap_path.write_text(json.dumps(snap, indent=2, ensure_ascii=False), encoding="utf-8")
 
     c = inv["counts"]
+    if lib_root:
+        thumb, color = first_thumb(ads, out_media)
+        summary = {"name": res["campaign"].get("name"), "notes": res["campaign"].get("notes") or "",
+                   "ads": len(ads), "brands": [b.get("page_name") or k for k, b in res["brands"].items()],
+                   "counts": {k: c.get(k, 0) for k in ("actual", "simulated", "not_eligible")},
+                   "updated": dt.datetime.now().isoformat(timespec="minutes"), "thumb": thumb, "thumb_color": color}
+        (out / library.SUMMARY).write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
+        libs = library.write_index(lib_root)
     print(f"Rendered {len(ads)} ads into {out}")
     print(f"  {c.get('actual',0)} actual, {c.get('simulated',0)} simulated, {c.get('not_eligible',0)} not eligible mockups")
     print(f"  media: {stored} referenced files -> {unique_files} unique files in media/")
     if rep.warnings:
         print(f"  {len(rep.warnings)} warning(s), see inventory.md")
     print(f"  open: {out / 'index.html'}")
+    if lib_root:
+        print(f"  library home ({len(libs)} librar{'y' if len(libs) == 1 else 'ies'}): {lib_root / 'index.html'}")
     if a.open:
         import webbrowser
         webbrowser.open((out / "index.html").as_uri())

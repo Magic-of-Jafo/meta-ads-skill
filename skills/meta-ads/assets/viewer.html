@@ -21,6 +21,8 @@ body{background:var(--ui-bg);color:var(--ui-text);font:14px/1.4 -apple-system,"S
 #bar .row{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
 #bar .row + .row{margin-top:8px}
 #bar h1{font-size:15px;margin:0;font-weight:700;white-space:nowrap}
+#bar select.libsel{font-weight:700;max-width:300px}
+#bar a.ib{text-decoration:none;color:inherit}
 #bar select{font:inherit;font-size:13px;max-width:260px;padding:4px 6px;border:1px solid var(--ui-line);border-radius:6px;background:var(--ui-panel);color:var(--ui-text)}
 .seg{display:inline-flex;border:1px solid var(--ui-line);border-radius:8px;overflow:hidden}
 .seg button{font:inherit;font-size:13px;font-weight:600;line-height:1.25;text-align:left;border:0;border-right:1px solid var(--ui-line);background:transparent;color:var(--ui-text);padding:5px 12px;cursor:pointer}
@@ -848,7 +850,7 @@ function toolbar(){
     <p><span class="dot simulated"></span><b>Simulated</b>: something was approximated, usually an image in the wrong shape (cropped, padded or blurred to fit) or placeholder creative. Hover a status to see why.</p>
     <p><span class="dot not_eligible"></span><b>Not eligible</b>: Meta doesn’t run this kind of ad in that placement.</p>
     <p style="color:var(--ui-sub)">Keys: ← → step through ads (or placements in Compare ads).</p>`;
-  $("#bar").innerHTML = `<div class="row"><h1>${esc(D.campaign.name || "Ad mockups")}</h1>
+  $("#bar").innerHTML = `<div class="row">${libCtl()}
     <span class="seg" role="tablist">${MODES.map(([v, l, d]) => `<button data-mode="${v}" class="${state.mode===v?"on":""}" role="tab" aria-selected="${state.mode===v}">${l}<small>${d}</small></button>`).join("")}</span>
     <span class="rhs">${menu("key", `<span><span class="dot actual"></span>Actual</span><span><span class="dot simulated"></span>Simulated</span><span>What’s this?</span>`, keyBody, true)}
     <button class="ib${state.dark ? " on" : ""}" data-dark aria-pressed="${state.dark}" title="Dark theme for the mockups and this viewer">${state.dark ? "☀ Light mode" : "☾ Dark mode"}</button></span></div>
@@ -865,6 +867,7 @@ function toolbar(){
   bar.querySelectorAll("[data-step]").forEach(b => b.onclick = () => stepAd(+b.dataset.step));
   bar.querySelectorAll("[data-plstep]").forEach(b => b.onclick = () => stepPl(+b.dataset.plstep));
   bar.querySelectorAll("[data-zoomstep]").forEach(b => b.onclick = () => { state.zoom = Math.round(Math.min(1.5, Math.max(0.3, state.zoom + +b.dataset.zoomstep)) * 100) / 100; go(); });
+  const ls = bar.querySelector("[data-lib]"); if (ls) ls.onchange = () => switchLibrary(ls.value);
   const clr = bar.querySelector("[data-clear]"); if (clr) clr.onclick = () => { state.group = state.brand = state.status = ""; go(); };
   bar.querySelectorAll("details.menu").forEach(d => d.ontoggle = () => {
     if (d.open) {
@@ -898,6 +901,25 @@ const MODES = [
   ["matrix", "Overview", "Every ad × placement"],
 ];
 let openMenu = null;   // which toolbar menu is open, kept across re-renders
+/* Libraries: render.py marks a viewer that lives in a library (meta-ads/<library>/viewer/) with
+   <meta name="meta-ads-library">. The shared list is ../../libraries.js, loaded after first paint. */
+const LIB_ID = document.querySelector('meta[name="meta-ads-library"]')?.content || null;
+let LIBS = null;
+function libCtl(){
+  const title = `<h1>${esc(D.campaign.name || "Ad mockups")}</h1>`;
+  const libs = (LIBS && LIBS.libraries || []).filter(l => l.rendered);
+  if (!LIB_ID || libs.length < 2) return title;
+  if (!libs.some(l => l.id === LIB_ID)) libs.unshift({id: LIB_ID, name: D.campaign.name || LIB_ID, ads: D.ads.length});
+  return `<div class="fld"><span class="lb" style="cursor:help" title="Each library is its own set of ads, kept in its own folder. Switching keeps your view and overlays.">Library</span><select data-lib aria-label="Library" class="libsel">${libs.map(l => `<option value="${esc(l.id)}" ${l.id === LIB_ID ? "selected" : ""}>${esc(l.name)} (${l.ads} ad${l.ads === 1 ? "" : "s"})</option>`).join("")}</select><a class="ib" href="../../index.html" title="All libraries, with what's in each">All libraries</a></div>`;
+}
+function switchLibrary(id){
+  if (!id || id === LIB_ID) return;
+  const q = new URLSearchParams();
+  for (const k of ["mode","pl"]) if (state[k]) q.set(k, state[k]);   // ad, group and brand belong to this library
+  for (const k of ["safe","trunc","badges","frame","dark","thumbs"]) q.set(k, state[k] ? "1" : "0");
+  q.set("zoom", state.zoom);
+  location.href = "../../" + encodeURIComponent(id) + "/viewer/index.html#" + q.toString();
+}
 function stepAd(d){
   const list = filteredAds(); if (!list.length) return;
   const i = list.findIndex(a => a.id === state.ad);
@@ -1032,6 +1054,12 @@ function exportView(){
 }
 readHash();
 if (state.export) exportView(); else go();
+if (LIB_ID && !state.export) {
+  const s = document.createElement("script");
+  s.src = "../../libraries.js?v=" + Date.now();   // fresh list even if another library was rendered since
+  s.onload = () => { LIBS = window.META_ADS_LIBRARIES || null; toolbar(); };
+  document.head.appendChild(s);                    // missing file (library moved on its own): no switcher
+}
 document.addEventListener("click", e => {
   if (e.target.closest("details.menu")) return;
   document.querySelectorAll("#bar details.menu[open]").forEach(d => d.open = false);

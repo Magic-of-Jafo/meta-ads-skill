@@ -23,6 +23,12 @@ A Claude Code skill that turns ad information (copy, headlines, CTAs, images, vi
 - **Copy-first.** Ads can use placeholder creative, so you can judge copy before any image exists.
 - **Shared media.** Each unique image is listed once and referenced by any number of ads. 100 ads using one image means one file.
 
+## Libraries
+
+Keep separate sets of ads apart: your drafts, each competitor, each campaign. Every **library** has its own folder with its spec, its media and its viewer, under `meta-ads/` in your project. A **Library** menu in the viewer switches between them, keeping your view, and `meta-ads/index.html` lists them all with their ad counts and last update.
+
+Ask for it in plain words: *"Start a mockup library called Acme competitors with their current ads"*, *"Add these two drafts to my Spring launch library"*. The agent creates and fills the folders, following the layout in [`SKILL.md`](skills/meta-ads/SKILL.md#libraries).
+
 ## See what your competitors are running
 
 The [Meta Ad Library](https://www.facebook.com/ads/library/) is Meta's public archive of the ads that brands are running right now. Give your agent a brand's Ad Library page and it can bring those ads into the viewer, so you see them the way customers do: in the feed, as Stories and Reels, on desktop. That's a far quicker read than the Library's own small previews. Then put them next to yours.
@@ -34,7 +40,7 @@ Things you can ask for:
 - *"Put my three draft ads next to [competitor]'s current ads in Compare ads, Facebook Feed."*
 - *"I have headlines in this spreadsheet and no images yet. Mock them up with placeholders."*
 
-Each brand gets its own name and logo in the mockups, and the Filter menu narrows the viewer to one brand. The skill itself doesn't fetch anything from the Ad Library. Your agent collects the ads with whatever tools it has (a browser, or an export you saved) and writes them into the skill's format. Meta's image links expire within days, so the agent saves the media locally.
+Each brand gets its own name and logo in the mockups, and the Filter menu narrows the viewer to one brand. Keep each competitor in its own library, or put their ads in the same library as yours to compare them side by side. The skill itself doesn't fetch anything from the Ad Library. Your agent collects the ads with whatever tools it has (a browser, or an export you saved) and writes them into the skill's format. Meta's image links expire within days, so the agent saves the media locally.
 
 ## How it works
 
@@ -44,7 +50,7 @@ The skill defines a format (`ads.json`, documented in [`skills/meta-ads/SPEC.md`
 ads.json  →  check.py (errors, gaps, unlock list)  →  render.py (viewer)  →  export_png.py (PNGs)
 ```
 
-Output goes to `meta-ads-output/<campaign>-<date>/` in the current project folder.
+A library's viewer goes to `meta-ads/<library>/viewer/` in the current project folder. A spec outside a library renders to `meta-ads-output/<campaign>-<date>/`.
 
 ## Install
 
@@ -84,7 +90,8 @@ Everything runs locally on your machine. The plugin has no hooks, no MCP servers
 
 - **Python scripts** in `skills/meta-ads/scripts/`, which Claude runs when you ask for mockups:
   - `check.py` validates your `ads.json` and writes `inventory.json` and `inventory.md` next to it.
-  - `render.py` copies your media into `meta-ads-output/<campaign>-<date>/` in the current folder and writes the viewer (`index.html`, `data.js`) there.
+  - `render.py` copies your media into the output folder (a library's `viewer/`, or `meta-ads-output/<campaign>-<date>/` in the current folder) and writes the viewer (`index.html`, `data.js`) there. For a library it also rewrites `index.html` and `libraries.js` in the library root (`meta-ads/`).
+  - `library.py` creates library folders under `meta-ads/` and rewrites that folder's `index.html` and `libraries.js`. It deletes nothing.
   - `export_png.py` saves PNGs into that folder's `png/` subfolder.
   - `sync_spec.py` is a maintenance script that regenerates tables in the docs.
 - **ffprobe / ffmpeg**, if installed, read video dimensions and save one cover frame per video.
