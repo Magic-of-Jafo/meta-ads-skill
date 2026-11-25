@@ -147,7 +147,11 @@ def main():
         "generated": dt.datetime.now().isoformat(timespec="seconds"),
     }
     (out / "data.js").write_text("window.META_ADS = " + json.dumps(data, ensure_ascii=False) + ";\n", encoding="utf-8")
-    shutil.copy2(VIEWER, out / "index.html")
+    # Point index.html at this render's data.js with a version stamp, so a browser that cached
+    # an earlier data.js (e.g. when served over http) can't show stale ads after a re-render.
+    stamp = dt.datetime.now().strftime("%Y%m%d%H%M%S")
+    html = VIEWER.read_text(encoding="utf-8").replace('<script src="data.js"></script>', f'<script src="data.js?v={stamp}"></script>', 1)
+    (out / "index.html").write_text(html, encoding="utf-8", newline="")
     # Self-contained snapshot: same spec, media paths pointing at the stored copies, so the
     # output folder can be re-rendered or moved. The agent's working ads.json is never touched.
     snap = json.loads(json.dumps(spec))

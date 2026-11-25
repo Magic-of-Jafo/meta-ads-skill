@@ -813,7 +813,11 @@ function toolbar(){
   const usesAd = state.mode === "feed" || state.mode === "gallery";
   const usesPl = state.mode === "feed" || state.mode === "compare";
   const idx = adsF.findIndex(a => a.id === state.ad);
-  const adOpts = adsF.map(a => `<option value="${esc(a.id)}" ${a.id===state.ad?"selected":""}>${esc(adOptionText(a))}</option>`).join("");
+  const optOf = a => `<option value="${esc(a.id)}" ${a.id===state.ad?"selected":""}>${esc(adOptionText(a))}</option>`;
+  const adBrands = [...new Set(adsF.map(a => a.brand))];
+  const adOpts = adBrands.length > 1
+    ? adBrands.map(b => `<optgroup label="${esc((D.brands[b] || {}).page_name || b)}">${adsF.filter(a => a.brand === b).map(optOf).join("")}</optgroup>`).join("")
+    : adsF.map(optOf).join("");
   const plGroups = [["facebook","Facebook"],["instagram","Instagram"]].map(([k, l]) => {
     const ps = D.placements.filter(p => p.platform === k);
     return ps.length ? `<optgroup label="${l}">${ps.map(p => `<option value="${p.id}" ${p.id===state.pl?"selected":""}>${esc(p.name)}</option>`).join("")}</optgroup>` : "";
@@ -848,7 +852,7 @@ function toolbar(){
     <span class="seg" role="tablist">${MODES.map(([v, l, d]) => `<button data-mode="${v}" class="${state.mode===v?"on":""}" role="tab" aria-selected="${state.mode===v}">${l}<small>${d}</small></button>`).join("")}</span>
     <span class="rhs">${menu("key", `<span><span class="dot actual"></span>Actual</span><span><span class="dot simulated"></span>Simulated</span><span>What’s this?</span>`, keyBody, true)}
     <button class="ib${state.dark ? " on" : ""}" data-dark aria-pressed="${state.dark}" title="Dark theme for the mockups and this viewer">${state.dark ? "☀ Light mode" : "☾ Dark mode"}</button></span></div>
-    <div class="row"><div class="fld"><span class="lb">Ad</span>${adCtl}</div>
+    <div class="row"><div class="fld"><span class="lb" style="cursor:help" title="Which ad to show. The names come from each ad’s label in your ads.json, grouped by the brand that ran it.">Ad</span>${adCtl}</div>
     <div class="fld"><span class="lb">Placement</span>${plCtl}</div>
     ${menu("filter", `Filter${nFilters ? ` <span class="nbadge">${nFilters}</span>` : ""} ${chev}`, filterBody)}
     ${menu("overlays", `Overlays ${chev}`, overlayBody)}
@@ -874,12 +878,19 @@ function toolbar(){
   document.documentElement.style.setProperty("--barh", (getComputedStyle(bar).position === "sticky" ? bar.offsetHeight : 0) + "px");
 }
 /* Human name for an ad: the spec's label, else its headline or opening text. IDs stay secondary. */
-function adName(ad){
-  const t = ad.label || ad.headline || (ad.cards && ad.cards[0] && ad.cards[0].headline) || (ad.primary_text || "").split("\n")[0] || ad.id;
-  return t.length > 70 ? t.slice(0, 68) + "…" : t;
-}
-const DUP_NAMES = (() => { const n = {}; D.ads.forEach(a => { const k = adName(a); n[k] = (n[k] || 0) + 1; }); return n; })();
-const adOptionText = ad => DUP_NAMES[adName(ad)] > 1 ? `${adName(ad)} · …${ad.id.slice(-6)}` : adName(ad);
+const fullName = ad => ad.label || ad.headline || (ad.cards && ad.cards[0] && ad.cards[0].headline) || (ad.primary_text || "").split("\n")[0] || ad.id;
+const clip = (t, n = 80) => t.length > n ? t.slice(0, n - 1) + "…" : t;
+const adName = ad => clip(fullName(ad));
+/* In the Ad picker the list is grouped by brand, so drop the brand's name from each entry,
+   and number ads that share a name ("version 2") rather than showing part of an ID. */
+const shortName = ad => { const pn = (brandOf(ad) || {}).page_name; return clip(fullName(ad).split(" · ").filter(x => x !== pn).join(" · ") || fullName(ad)); };
+const AD_VERSION = (() => {
+  const total = {}, seen = {}, out = {};
+  D.ads.forEach(a => { const k = a.brand + "|" + shortName(a); total[k] = (total[k] || 0) + 1; });
+  D.ads.forEach(a => { const k = a.brand + "|" + shortName(a); if (total[k] > 1) out[a.id] = seen[k] = (seen[k] || 0) + 1; });
+  return out;
+})();
+const adOptionText = ad => shortName(ad) + (AD_VERSION[ad.id] ? ` (version ${AD_VERSION[ad.id]})` : "");
 const MODES = [
   ["feed", "Feed preview", "One ad, in context"],
   ["compare", "Compare ads", "All ads, one placement"],
@@ -901,8 +912,10 @@ function statusTitle(c){
   if (c.status === "simulated") return "Simulated, approximated because: " + (c.reasons || []).join("; ");
   return (c.status || "").replace("_", " ") + ((c.reasons || []).length ? ": " + c.reasons.join("; ") : "");
 }
-function filteredAds(){
-  return D.ads.filter(a => (!state.group || a.group === state.group) && (!state.brand || a.brand === state.brand));
+const BRAND_RANK = {}; D.ads.forEach(a => { if (!(a.brand in BRAND_RANK)) BRAND_RANK[a.brand] = Object.keys(BRAND_RANK).length; });
+const ADS_BY_BRAND = D.ads.map((a, i) => [a, i]).sort((x, y) => (BRAND_RANK[x[0].brand] - BRAND_RANK[y[0].brand]) || (x[1] - y[1])).map(x => x[0]);
+function filteredAds(){   // grouped by brand (in order of first appearance), spec order within a brand
+  return ADS_BY_BRAND.filter(a => (!state.group || a.group === state.group) && (!state.brand || a.brand === state.brand));
 }
 function statusOk(c){ return !state.status || c.status === state.status; }
 

@@ -1,6 +1,6 @@
 {
   "name": "meta-ads",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Render realistic in-situ mockups of Facebook and Instagram ads (image, video, carousel) across 15 Meta placements, as an interactive local HTML viewer plus PNGs.",
   "author": { "name": "Magic-of-Jafo", "url": "https://github.com/Magic-of-Jafo" },
   "homepage": "https://github.com/Magic-of-Jafo/meta-ads-skill",
