@@ -13,11 +13,12 @@ A Claude Code skill that turns ad information (copy, headlines, CTAs, images, vi
   - Instagram: Feed, Stories, Reels, Explore, Explore Home, Profile Feed.
 - **Image, video and carousel** ads. Videos play and carousels swipe in the viewer.
 - **Viewer modes:**
-  - **In feed:** the ad between organic posts.
-  - **Compare:** variants side by side in one placement.
-  - **Gallery:** one ad in every placement.
-  - **Matrix:** every ad × every placement.
-- **Review overlays:** Stories/Reels safe zones, where the text cuts off ("…See more") and how long it is against Meta's recommendation, and badges explaining any fallback. Plus a phone frame, dark mode and zoom.
+  - **Feed preview:** one ad between ordinary posts, the way someone scrolling would see it.
+  - **Compare ads:** every ad side by side in one placement.
+  - **All placements:** one ad in every placement, grouped by Facebook phone, Instagram and Facebook desktop.
+  - **Overview:** a grid of every ad × every placement, coloured by status. Click a cell to open it.
+  - Step through ads with ‹ › or the arrow keys; Filter narrows by group, brand or status.
+- **Overlays:** Stories/Reels safe areas, where the text gets cut off ("…See more") and how long it is against Meta's recommendation, and notes saying why a mockup is simulated. Plus a phone frame, dark mode and zoom.
 - **Gap report.** `check.py` says which mockups are native fits and which are simulated (wrong ratio, placeholder creative, missing logo), and ranks what to add next. For example: *"Add a 9:16 version of m_hero → 12 mockups become native"*.
 - **Copy-first.** Ads can use placeholder creative, so you can judge copy before any image exists.
 - **Shared media.** Each unique image is listed once and referenced by any number of ads. 100 ads using one image means one file.

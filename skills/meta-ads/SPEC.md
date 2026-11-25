@@ -60,7 +60,7 @@ with, in `media`:
 
 Save the file locally and reference it as an `image` media entry. Only if none of these work, create a `placeholder` avatar (ratio `1:1`, a `label` naming the logo, and the brand's main colour as `color` if known). The initials come from each brand's `page_name`, so one placeholder per brand keeps the shopping list clear.
 
-Several brands let you put competitor ads beside your own in Compare mode; give each ad `"brand": "<id>"`.
+Several brands let you put competitor ads beside your own in the Compare ads view; give each ad `"brand": "<id>"`.
 
 ## 5. `media`
 

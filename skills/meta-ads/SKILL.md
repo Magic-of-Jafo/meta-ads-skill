@@ -32,8 +32,8 @@ The skill never reads spreadsheets, Excel files, briefs or web pages itself. Get
 
 ## What the user gets in the viewer
 
-- **Modes**: Gallery (one ad, every placement) · Compare (one placement, all variants side by side, filter by group/brand/status) · In feed (the ad between organic posts, scrollable phone or story sequence) · Matrix (all ads × placements, optional thumbnails).
-- **Toggles**: safe zones (Stories/Reels UI cover areas), text limits (where copy truncates, chars vs recommendation), badges (why a mockup is simulated), phone frame, dark mode, zoom.
+- **Views**: Feed preview (default; one ad between ordinary posts, scrollable phone or story sequence) · Compare ads (every ad in one placement, side by side) · All placements (one ad everywhere, grouped Facebook phone / Instagram / Facebook desktop) · Overview (every ad × placement grid coloured by status, optional thumbnails). ‹ › or the arrow keys step through ads; Filter narrows by group, brand or status.
+- **Overlays menu**: Stories and Reels safe areas, where text gets cut off (chars vs recommendation), why it's simulated, phone frame, dark mode. Zoom has its own − / + control. "What's this?" explains actual vs simulated.
 - Videos play, carousels swipe, "See more" expands. Every view is a URL hash, so a link to a specific view can be shared alongside the folder.
 
 ## Rules for using the output
