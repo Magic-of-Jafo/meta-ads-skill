@@ -22,9 +22,8 @@ Agents in different projects must find the same shared root without being told e
 
 - `library.py` and `render.py` look for the root in this order:
   1. `--root DIR`
-  2. the `META_ADS_ROOT` environment variable
-  3. a `meta-ads.config.json` in the current folder or a parent folder, with `{"root": "<path>"}`
-  4. `./meta-ads/`
+  2. a `meta-ads.config.json` in the current folder or a parent folder, with `{"root": "<path>"}`
+  3. `./meta-ads/`
 - `library.py where` prints the root in use and how it was found.
 - SKILL.md tells the agent to check `library.py where` before creating a library, so a team member doesn't create a private library by accident.
 
