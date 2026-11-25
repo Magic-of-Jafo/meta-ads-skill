@@ -33,7 +33,7 @@ The skill never reads spreadsheets, Excel files, briefs or web pages itself. Get
 ## What the user gets in the viewer
 
 - **Views**: Feed preview (default; one ad between ordinary posts, scrollable phone or story sequence) · Compare ads (every ad in one placement, side by side) · All placements (one ad everywhere, grouped Facebook phone / Instagram / Facebook desktop) · Overview (every ad × placement grid coloured by status, optional thumbnails). ‹ › or the arrow keys step through ads; Filter narrows by group, brand or status.
-- **Overlays menu**: Stories and Reels safe areas, where text gets cut off (chars vs recommendation), why it's simulated, phone frame, dark mode. Zoom has its own − / + control. "What's this?" explains actual vs simulated.
+- **Overlays menu**: Stories and Reels safe areas, where text gets cut off (chars vs recommendation), why it's simulated, phone frame. Dark mode has its own button at the top right, and zoom its own − / + control. "What's this?" explains actual vs simulated.
 - Videos play, carousels swipe, "See more" expands. Every view is a URL hash, so a link to a specific view can be shared alongside the folder.
 
 ## Rules for using the output

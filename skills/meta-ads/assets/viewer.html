@@ -50,13 +50,14 @@ details.menu[open] > summary{border-color:var(--ui-accent)}
 .pop .fld select{flex:1}
 .pop p{margin:0}
 .nbadge{background:var(--ui-accent);color:#fff;border-radius:9px;font-size:11px;font-weight:600;padding:0 6px;line-height:16px}
-.key{margin-left:auto}
+.rhs{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:nowrap}
+.ib.on{background:var(--ui-text);color:var(--ui-panel);border-color:var(--ui-text)}
 .key summary{border:0;background:transparent;color:var(--ui-sub);font-size:12px;gap:10px}
 .key .dot{margin-right:4px;vertical-align:-1px}
 .sec-h{font-size:13px;font-weight:700;margin:6px 0 12px;color:var(--ui-text)}
 .sec + .sec{margin-top:30px}
 .adid{font-weight:400;color:var(--ui-sub);font-size:11px}
-@media (max-width:700px){#bar{position:static}.seg button small{display:none}.key{margin-left:0}}
+@media (max-width:700px){#bar{position:static}.seg button small{display:none}.rhs{margin-left:0}}
 #main{padding:20px 16px 60px}
 .summary{font-size:12px;color:var(--ui-sub);margin:0 0 14px}
 .tiles{display:flex;flex-wrap:wrap;gap:28px 24px;align-items:flex-start}
@@ -838,14 +839,15 @@ function toolbar(){
     ${opt("badges", "Why it’s simulated", "Notes on each simulated mockup saying what was approximated.")}
     ${state.mode !== "feed" ? opt("frame", "Phone frame", "Shows phone placements inside a phone you can scroll.") : ""}
     ${state.mode === "matrix" ? opt("thumbs", "Thumbnails", "Small previews in the grid instead of coloured dots.") : ""}
-    ${opt("dark", "Dark mode", "Dark theme for the mockups and this viewer.")}`;
+`;
   const keyBody = `<p><span class="dot actual"></span><b>Actual</b>: the placement shows your creative as supplied, so the mockup should match what Meta shows.</p>
     <p><span class="dot simulated"></span><b>Simulated</b>: something was approximated, usually an image in the wrong shape (cropped, padded or blurred to fit) or placeholder creative. Hover a status to see why.</p>
     <p><span class="dot not_eligible"></span><b>Not eligible</b>: Meta doesn’t run this kind of ad in that placement.</p>
     <p style="color:var(--ui-sub)">Keys: ← → step through ads (or placements in Compare ads).</p>`;
   $("#bar").innerHTML = `<div class="row"><h1>${esc(D.campaign.name || "Ad mockups")}</h1>
     <span class="seg" role="tablist">${MODES.map(([v, l, d]) => `<button data-mode="${v}" class="${state.mode===v?"on":""}" role="tab" aria-selected="${state.mode===v}">${l}<small>${d}</small></button>`).join("")}</span>
-    ${menu("key", `<span><span class="dot actual"></span>Actual</span><span><span class="dot simulated"></span>Simulated</span><span>What’s this?</span>`, keyBody, true)}</div>
+    <span class="rhs">${menu("key", `<span><span class="dot actual"></span>Actual</span><span><span class="dot simulated"></span>Simulated</span><span>What’s this?</span>`, keyBody, true)}
+    <button class="ib${state.dark ? " on" : ""}" data-dark aria-pressed="${state.dark}" title="Dark theme for the mockups and this viewer">${state.dark ? "☀ Light mode" : "☾ Dark mode"}</button></span></div>
     <div class="row"><div class="fld"><span class="lb">Ad</span>${adCtl}</div>
     <div class="fld"><span class="lb">Placement</span>${plCtl}</div>
     ${menu("filter", `Filter${nFilters ? ` <span class="nbadge">${nFilters}</span>` : ""} ${chev}`, filterBody)}
@@ -855,6 +857,7 @@ function toolbar(){
   bar.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { state.mode = b.dataset.mode; go(); });
   bar.querySelectorAll("[data-sel]").forEach(s => s.onchange = () => { state[s.dataset.sel] = s.value; if (s.dataset.sel === "ad") state.card = 0; go(); });
   bar.querySelectorAll("[data-tog]").forEach(c => c.onchange = () => { state[c.dataset.tog] = c.checked; go(); });
+  bar.querySelector("[data-dark]").onclick = () => { state.dark = !state.dark; go(); };
   bar.querySelectorAll("[data-step]").forEach(b => b.onclick = () => stepAd(+b.dataset.step));
   bar.querySelectorAll("[data-plstep]").forEach(b => b.onclick = () => stepPl(+b.dataset.plstep));
   bar.querySelectorAll("[data-zoomstep]").forEach(b => b.onclick = () => { state.zoom = Math.round(Math.min(1.5, Math.max(0.3, state.zoom + +b.dataset.zoomstep)) * 100) / 100; go(); });
