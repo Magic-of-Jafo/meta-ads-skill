@@ -51,14 +51,16 @@ meta-ads/
 5. **PNGs (when useful)**: `python "${CLAUDE_SKILL_DIR}/scripts/export_png.py" <output folder> [--ads A1,A2] [--placements ig_reels,fb_feed_mobile] [--dark] [--safe] [--limits] [--badges] [--all-cards]`
    Default is the clean in-situ view. `--safe`, `--limits` and `--badges` add review overlays and name files `__review`. Scope the export when there are many ads: 100 ads × 15 placements is 1,500 images.
 
-6. **Present**: give the user the path to the library's `viewer/index.html` (it opens offline by double-click), mention `meta-ads/index.html` when there's more than one library, and summarize the inventory: how many mockups are actual or simulated, and the top unlocks.
+6. **Share (when asked)**: `python "${CLAUDE_SKILL_DIR}/scripts/share.py" <viewer folder> [--ads A1,A2]` writes one self-contained `.html` (for a library: `<library>/share/<name>-<date>.html`). It opens offline with no other files, so the user can send it by email, Slack or a shared drive. Videos become their cover frame, since the copy is for judging layout, not playback. Images are scaled down unless `--full-res` is given. Use `--ads` for a subset, especially if it reports more than 20 MB. Never upload or post it yourself; hand the file to the user.
+
+7. **Present**: give the user the path to the library's `viewer/index.html` (it opens offline by double-click), mention `meta-ads/index.html` when there's more than one library, and summarize the inventory: how many mockups are actual or simulated, and the top unlocks.
 
 ## What the user gets in the viewer
 
 - **Library menu** (top left, when there are two or more rendered libraries): switches library and keeps the current view and overlays. "All libraries" opens the home page, which shows each library's ads, brands, counts and last update.
 - **Views**: Feed preview (default; one ad between ordinary posts, scrollable phone or story sequence) · Compare ads (every ad in one placement, side by side) · All placements (one ad everywhere, grouped Facebook phone / Instagram / Facebook desktop) · Overview (every ad × placement grid coloured by status, optional thumbnails). ‹ › or the arrow keys step through ads; Filter narrows by group, brand or status.
 - **Overlays menu**: Stories and Reels safe areas, where text gets cut off (chars vs recommendation), why it's simulated, phone frame. Dark mode has its own button at the top right, and zoom its own − / + control. "What's this?" explains actual vs simulated.
-- Videos play, carousels swipe, "See more" expands. Every view is a URL hash, so a link to a specific view can be shared alongside the folder.
+- Videos play, carousels swipe, "See more" expands. Every view is a URL hash, so a link to a specific view can be shared alongside the folder. Settings (view, placement, overlays, dark mode, zoom) are remembered in the browser and carry across libraries; the last ad and filters are remembered per library.
 
 ## Rules for using the output
 
@@ -80,6 +82,7 @@ meta-ads/
 | `scripts/check.py` | Validate + inventory |
 | `scripts/render.py` | Build the viewer (a library's `viewer/`, or a dated output folder) |
 | `scripts/library.py` | Create, list and re-index libraries |
+| `scripts/share.py` | Single-file copy of a viewer to send to someone |
 | `scripts/export_png.py` | Headless Chrome/Edge PNG export |
 | `scripts/sync_spec.py` | Regenerate SPEC tables after editing placements.json |
 | `references/placements.md` | Sources, assumptions, fidelity notes, maintenance |

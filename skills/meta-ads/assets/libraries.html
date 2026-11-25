@@ -40,6 +40,7 @@ code{font-size:12px;background:var(--bg);border:1px solid var(--line);border-rad
   <p>Each library is its own set of ads, kept in its own folder here. Open one to see its mockups; inside, the Library menu switches between them.</p>
 </header>
 <main id="main"></main>
+<script>try { const p = JSON.parse(localStorage.getItem("meta-ads:prefs") || "{}"); if ("dark" in p) document.documentElement.dataset.theme = p.dark ? "dark" : "light"; } catch (e) {}</script>
 <script src="libraries.js"></script>
 <script>
 "use strict";

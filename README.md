@@ -18,6 +18,7 @@ A Claude Code skill that turns ad information (copy, headlines, CTAs, images, vi
   - **All placements:** one ad in every placement, grouped by Facebook phone, Instagram and Facebook desktop.
   - **Overview:** a grid of every ad × every placement, coloured by status. Click a cell to open it.
   - Step through ads with ‹ › or the arrow keys; Filter narrows by group, brand or status.
+- **Remembers your settings** (view, placement, overlays, dark mode, zoom) across visits and libraries, in your browser.
 - **Overlays:** Stories/Reels safe areas, where the text gets cut off ("…See more") and how long it is against Meta's recommendation, and notes saying why a mockup is simulated. Plus a phone frame, dark mode and zoom.
 - **Gap report.** `check.py` says which mockups are native fits and which are simulated (wrong ratio, placeholder creative, missing logo), and ranks what to add next. For example: *"Add a 9:16 version of m_hero → 12 mockups become native"*.
 - **Copy-first.** Ads can use placeholder creative, so you can judge copy before any image exists.
@@ -28,6 +29,16 @@ A Claude Code skill that turns ad information (copy, headlines, CTAs, images, vi
 Keep separate sets of ads apart: your drafts, each competitor, each campaign. Every **library** has its own folder with its spec, its media and its viewer, under `meta-ads/` in your project. A **Library** menu in the viewer switches between them, keeping your view, and `meta-ads/index.html` lists them all with their ad counts and last update.
 
 Ask for it in plain words: *"Start a mockup library called Acme competitors with their current ads"*, *"Add these two drafts to my Spring launch library"*. The agent creates and fills the folders, following the layout in [`SKILL.md`](skills/meta-ads/SKILL.md#libraries).
+
+## Share mockups
+
+To show the mockups to someone, ask for a **single-file share**: *"Make a shareable file of the Spring launch library"*. You get one `.html` file with everything inside it. Send it by email, Slack or Teams, or drop it in a shared drive. The recipient downloads it and double-clicks it: no install, no account, and nothing is uploaded anywhere.
+
+- Videos appear as their cover frame. The share is for judging how each ad looks on the device (text against image, margins, safe areas), and it keeps the file small.
+- You can share only some ads. Images are scaled to phone-mockup size unless you ask for full resolution.
+- Open the file in the browser, not in a web preview such as Google Drive's, which won't run it.
+
+Team access through a shared folder, with videos playing, is planned: see [`docs/specs/shared-folder-libraries.md`](docs/specs/shared-folder-libraries.md).
 
 ## See what your competitors are running
 
@@ -91,12 +102,13 @@ Everything runs locally on your machine. The plugin has no hooks, no MCP servers
 - **Python scripts** in `skills/meta-ads/scripts/`, which Claude runs when you ask for mockups:
   - `check.py` validates your `ads.json` and writes `inventory.json` and `inventory.md` next to it.
   - `render.py` copies your media into the output folder (a library's `viewer/`, or `meta-ads-output/<campaign>-<date>/` in the current folder) and writes the viewer (`index.html`, `data.js`) there. For a library it also rewrites `index.html` and `libraries.js` in the library root (`meta-ads/`).
+  - `share.py` writes a single-file copy of a viewer (images embedded, videos as cover frames) into a `share/` folder. It sends nothing; you decide where the file goes.
   - `library.py` creates library folders under `meta-ads/` and rewrites that folder's `index.html` and `libraries.js`. It deletes nothing.
   - `export_png.py` saves PNGs into that folder's `png/` subfolder.
   - `sync_spec.py` is a maintenance script that regenerates tables in the docs.
 - **ffprobe / ffmpeg**, if installed, read video dimensions and save one cover frame per video.
 - **Chrome or Edge, headless**, opens the local `index.html` to take the PNG screenshots, using a temporary profile folder that is deleted afterwards.
-- **Network:** the only network access is downloading media you list in `ads.json` as `http(s)://` URLs. Each file is fetched once with a plain GET into the output folder. Nothing is uploaded or sent anywhere, and the viewer page loads nothing from the web.
+- **Network:** the only network access is downloading media you list in `ads.json` as `http(s)://` URLs. Each file is fetched once with a plain GET into the output folder. Nothing is uploaded or sent anywhere, and the viewer page loads nothing from the web. The viewer keeps your settings in the browser's local storage on your machine.
 
 ## Try it
 

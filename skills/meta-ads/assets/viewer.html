@@ -430,6 +430,28 @@ function writeHash(){
   for (const k of ["safe","trunc","badges","frame","dark","thumbs"]) q.set(k, state[k] ? "1" : "0");
   q.set("zoom", state.zoom);
   history.replaceState(null, "", "#" + q.toString());
+  savePrefs();
+}
+/* Settings survive closing the page and switching libraries. Look and layout settings are shared by
+   every library; the chosen ad and filters are kept per library. A link's own #settings win over
+   stored ones. Never used for PNG export, which must render exactly what its URL says. */
+const PREF_GLOBAL = ["mode","pl","safe","trunc","badges","frame","dark","thumbs","zoom"];
+const PREF_LOCAL = ["ad","group","brand","status"];
+const prefKey = () => "meta-ads:lib:" + (LIB_ID || (D.campaign && D.campaign.name) || "default");
+function loadPrefs(){
+  try {
+    const g = JSON.parse(localStorage.getItem("meta-ads:prefs") || "{}");
+    const l = JSON.parse(localStorage.getItem(prefKey()) || "{}");
+    for (const k of PREF_GLOBAL) if (k in g) state[k] = g[k];
+    for (const k of PREF_LOCAL) if (k in l) state[k] = l[k];
+  } catch (e) { /* storage blocked: defaults */ }
+}
+function savePrefs(){
+  if (state.export) return;
+  try {
+    localStorage.setItem("meta-ads:prefs", JSON.stringify(Object.fromEntries(PREF_GLOBAL.map(k => [k, state[k]]))));
+    localStorage.setItem(prefKey(), JSON.stringify(Object.fromEntries(PREF_LOCAL.map(k => [k, state[k]]))));
+  } catch (e) { /* storage blocked or full: settings just won't persist */ }
 }
 
 /* ------------------------------------------------------------------ helpers */
@@ -484,7 +506,7 @@ function mediaEl(slot, opts = {}){
   return `<div class="media" style="${style};${padbg}${opts.style||""}">${html}${vb}</div>`;
 }
 function mediaInner(m, cls, opts){
-  if (m.kind === "video" && !state.export) {
+  if (m.kind === "video" && !state.export && m.src) {   // shared copies keep only the cover frame
     return `<video class="${cls}" src="${esc(m.src)}" poster="${esc(m.poster||"")}" muted autoplay loop playsinline preload="metadata"></video>`;
   }
   return `<img class="${cls}" src="${esc(m.kind === "video" ? m.poster : m.src)}" alt="" loading="${state.export ? "eager" : "lazy"}">`;
@@ -906,7 +928,8 @@ let openMenu = null;   // which toolbar menu is open, kept across re-renders
 const LIB_ID = document.querySelector('meta[name="meta-ads-library"]')?.content || null;
 let LIBS = null;
 function libCtl(){
-  const title = `<h1>${esc(D.campaign.name || "Ad mockups")}</h1>`;
+  const shared = D.share ? `<span class="fixed" style="cursor:help" title="A single-file copy made ${esc((D.share.created || "").replace("T", " "))}, for review. These are mockups, not live ads.${D.share.videos_as_frames ? " Videos are shown as their cover frame, to judge layout, text and margins." : ""}">Shared copy${D.share.videos_as_frames ? " · videos as still frames" : ""}</span>` : "";
+  const title = `<h1>${esc(D.campaign.name || "Ad mockups")}</h1>${shared}`;
   const libs = (LIBS && LIBS.libraries || []).filter(l => l.rendered);
   if (!LIB_ID || libs.length < 2) return title;
   if (!libs.some(l => l.id === LIB_ID)) libs.unshift({id: LIB_ID, name: D.campaign.name || LIB_ID, ads: D.ads.length});
@@ -1052,6 +1075,7 @@ function exportView(){
   // pin feed mockups to a phone-like minimum height so short posts still read as a screen
   document.title = "ready";
 }
+if (!/^#export/.test(location.hash)) loadPrefs();
 readHash();
 if (state.export) exportView(); else go();
 if (LIB_ID && !state.export) {
