@@ -162,7 +162,7 @@ def main():
 
     c = inv["counts"]
     print(f"Rendered {len(ads)} ads into {out}")
-    print(f"  {c.get('ready',0)} ready, {c.get('simulated',0)} simulated, {c.get('not_eligible',0)} not eligible mockups")
+    print(f"  {c.get('actual',0)} actual, {c.get('simulated',0)} simulated, {c.get('not_eligible',0)} not eligible mockups")
     print(f"  media: {stored} referenced files -> {unique_files} unique files in media/")
     if rep.warnings:
         print(f"  {len(rep.warnings)} warning(s), see inventory.md")

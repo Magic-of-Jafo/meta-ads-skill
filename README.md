@@ -13,9 +13,9 @@ A Claude Code skill that turns ad information (copy, headlines, CTAs, images, vi
   - Instagram: Feed, Stories, Reels, Explore, Explore Home, Profile Feed.
 - **Image, video and carousel** ads. Videos play and carousels swipe in the viewer.
 - **Viewer modes:**
-  - **Gallery:** one ad in every placement.
-  - **Compare:** variants side by side in one placement.
   - **In feed:** the ad between organic posts.
+  - **Compare:** variants side by side in one placement.
+  - **Gallery:** one ad in every placement.
   - **Matrix:** every ad × every placement.
 - **Review overlays:** Stories/Reels safe zones, where the text cuts off ("…See more") and how long it is against Meta's recommendation, and badges explaining any fallback. Plus a phone frame, dark mode and zoom.
 - **Gap report.** `check.py` says which mockups are native fits and which are simulated (wrong ratio, placeholder creative, missing logo), and ranks what to add next. For example: *"Add a 9:16 version of m_hero → 12 mockups become native"*.

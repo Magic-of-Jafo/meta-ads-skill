@@ -28,7 +28,7 @@ The skill never reads spreadsheets, Excel files, briefs or web pages itself. Get
 5. **PNGs (when useful)**: `python "${CLAUDE_SKILL_DIR}/scripts/export_png.py" <output folder> [--ads A1,A2] [--placements ig_reels,fb_feed_mobile] [--dark] [--safe] [--limits] [--badges] [--all-cards]`
    Default is the clean in-situ view. `--safe`, `--limits` and `--badges` add review overlays and name files `__review`. Scope the export when there are many ads: 100 ads × 15 placements is 1,500 images.
 
-6. **Present**: give the user the path to `index.html` (it opens offline by double-click) and summarize the inventory: how many mockups are ready or simulated, and the top unlocks.
+6. **Present**: give the user the path to `index.html` (it opens offline by double-click) and summarize the inventory: how many mockups are actual or simulated, and the top unlocks.
 
 ## What the user gets in the viewer
 

@@ -5,7 +5,7 @@ Usage:
                          [--dark] [--badges] [--scale 2] [--workers 4] [--all-cards]
 
 OUTPUT_DIR is the folder render.py wrote (it contains index.html and data.js).
-PNGs go to OUTPUT_DIR/png/<ad>__<placement>[__dark][__cardN].png. Only ready or
+PNGs go to OUTPUT_DIR/png/<ad>__<placement>[__dark][__cardN].png. Only actual or
 simulated mockups are exported. Clean in-situ view by default (no overlays).
 """
 import argparse
@@ -112,7 +112,7 @@ def main():
     for ad in ads:
         for pid in pls:
             cell = data["matrix"][ad][pid]
-            if cell["status"] not in ("ready", "simulated"):
+            if cell["status"] not in ("actual", "simulated"):
                 continue
             p = pl[pid]
             full = p["template"] in ("fb_stories", "ig_stories", "fb_reels", "ig_reels")
@@ -128,7 +128,7 @@ def main():
                 h = 852 if full else (2600 if p["device"] == "desktop" else 2600)  # tall window; trim() removes the excess
                 jobs.append(((out / "index.html").as_uri() + "#" + frag, name, w, h))
     if not jobs:
-        print("Nothing to export (no ready/simulated mockups match).")
+        print("Nothing to export (no actual/simulated mockups match).")
         return
     png_dir = out / "png"
     png_dir.mkdir(exist_ok=True)

@@ -278,7 +278,7 @@ Smallest valid file:
 
 - `errors`: must fix before rendering (`where` points at the field, e.g. `ads[A3].creative.9:16`).
 - `warnings`: renderable, but worth a look (missing copy, unknown fields, low resolution, duplicate media).
-- `matrix[ad][placement].status`: `ready` (native fit, real creative), `simulated` (renders with a fallback or placeholder; `reasons` says why), `not_eligible` (format can't run there), `excluded` (by the ad's `placements`).
+- `matrix[ad][placement].status`: `actual` (native fit, real creative), `simulated` (renders with a fallback or placeholder; `reasons` says why), `not_eligible` (format can't run there), `excluded` (by the ad's `placements`).
 - `unlock`: what to add next, ranked by how many mockups it improves, e.g. "Add a 9:16 version of m_hero → 12 mockups become native".
 - `shopping_list`: every placeholder, what it should show, and the ratios needed to cover all placements.
 

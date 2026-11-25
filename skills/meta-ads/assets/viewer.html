@@ -34,7 +34,7 @@ body{background:var(--ui-bg);color:var(--ui-text);font:14px/1.4 -apple-system,"S
 .tile-h b{font-size:13px}
 .tile-h .why{color:var(--ui-sub);font-size:11px}
 .pill{font-size:11px;font-weight:600;padding:1px 6px;border-radius:9px;white-space:nowrap}
-.pill.ready{background:#e3f6ea;color:var(--ok)} .pill.simulated{background:#fdf0dc;color:var(--warn)} .pill.not_eligible,.pill.excluded{background:#f9e1de;color:var(--bad)}
+.pill.actual{background:#e3f6ea;color:var(--ok)} .pill.simulated{background:#fdf0dc;color:var(--warn)} .pill.not_eligible,.pill.excluded{background:#f9e1de;color:var(--bad)}
 .reasons{font-size:11px;color:var(--ui-sub);margin:0;padding-left:16px;max-width:var(--tw,400px)}
 .reasons li.copy{color:var(--warn)}
 .empty{color:var(--ui-sub);padding:40px;text-align:center}
@@ -46,7 +46,7 @@ table.mx td:hover{outline:2px solid var(--ui-accent)}
 .mxthumb{width:140px;height:220px;overflow:hidden;position:relative;margin:0 auto}
 .mxthumb > .scaler{transform:scale(.33);transform-origin:0 0;position:absolute;left:0;top:0}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%}
-.dot.ready{background:var(--ok)} .dot.simulated{background:var(--warn)} .dot.not_eligible{background:var(--bad)} .dot.excluded{background:#999}
+.dot.actual{background:var(--ok)} .dot.simulated{background:var(--warn)} .dot.not_eligible{background:var(--bad)} .dot.excluded{background:#999}
 
 /* ============================================================ export mode */
 body.export{background:#01fe02}
@@ -512,7 +512,7 @@ function safeOverlay(p){
   return out.join("");
 }
 function badge(c, top){
-  if (!state.badges || !c || c.status === "ready") return "";
+  if (!state.badges || !c || c.status === "actual") return "";
   const r = (c.reasons || [])[0] || c.status;
   return `<div class="ov-badge${top ? " top" : ""}">⚠ ${esc(r)}${c.reasons.length > 1 ? ` (+${c.reasons.length-1})` : ""}</div>`;
 }
@@ -773,12 +773,12 @@ function toolbar(){
   const seg = (k, opts) => `<span class="seg">${opts.map(([v,l]) => `<button data-set="${k}" data-val="${v}" class="${state[k]===v?"on":""}">${l}</button>`).join("")}</span>`;
   const tog = (k, l) => `<label><input type="checkbox" data-tog="${k}" ${state[k]?"checked":""}>${l}</label>`;
   $("#bar").innerHTML = `<h1>${esc(D.campaign.name || "Ad mockups")}</h1>
-    ${seg("mode", [["gallery","Gallery"],["compare","Compare"],["feed","In feed"],["matrix","Matrix"]])}
+    ${seg("mode", [["feed","In feed"],["compare","Compare"],["gallery","Gallery"],["matrix","Matrix"]])}
     <span class="grp">${state.mode !== "compare" && state.mode !== "matrix" ? `<select data-sel="ad">${adOpts}</select>` : ""}
     ${state.mode !== "gallery" && state.mode !== "matrix" ? `<select data-sel="pl">${plOpts}</select>` : ""}
     ${groups.length ? `<select data-sel="group"><option value="">All groups</option>${groups.map(g => `<option ${g===state.group?"selected":""}>${esc(g)}</option>`).join("")}</select>` : ""}
     ${brands.length > 1 ? `<select data-sel="brand"><option value="">All brands</option>${brands.map(b => `<option value="${esc(b.id)}" ${b.id===state.brand?"selected":""}>${esc(b.page_name)}</option>`).join("")}</select>` : ""}
-    <select data-sel="status"><option value="">Any status</option>${[["ready","Ready only"],["simulated","Simulated only"]].map(([v,l]) => `<option value="${v}" ${v===state.status?"selected":""}>${l}</option>`).join("")}</select></span>
+    <select data-sel="status"><option value="">Any status</option>${[["actual","Actual only"],["simulated","Simulated only"]].map(([v,l]) => `<option value="${v}" ${v===state.status?"selected":""}>${l}</option>`).join("")}</select></span>
     <span class="grp">${tog("safe","Safe zones")}${tog("trunc","Text limits")}${tog("badges","Badges")}${tog("frame","Phone frame")}${tog("dark","Dark")}${state.mode==="matrix"?tog("thumbs","Thumbnails"):""}
     <label>Zoom <input type="range" min="0.4" max="1.2" step="0.05" value="${state.zoom}" data-zoom></label></span>`;
   $("#bar").querySelectorAll("[data-set]").forEach(b => b.onclick = () => { state[b.dataset.set] = b.dataset.val; go(); });
@@ -842,7 +842,7 @@ function viewMatrix(){
   const head = `<tr><th></th>${D.placements.map(p => `<th>${esc(p.short)}</th>`).join("")}</tr>`;
   const rows = ads.map(ad => `<tr><th class="ad">${esc(ad.id)}${ad.label ? `<br><span style="font-weight:400;color:var(--ui-sub)">${esc(ad.label)}</span>` : ""}</th>${D.placements.map(p => {
     const c = cell(ad, p.id);
-    const inner = state.thumbs && (c.status === "ready" || c.status === "simulated") ? `<div class="mxthumb" data-lazy="${esc(ad.id)}|${p.id}"></div>` : `<span class="dot ${c.status}"></span>`;
+    const inner = state.thumbs && (c.status === "actual" || c.status === "simulated") ? `<div class="mxthumb" data-lazy="${esc(ad.id)}|${p.id}"></div>` : `<span class="dot ${c.status}"></span>`;
     return `<td title="${esc(p.name + ": " + c.status + (c.reasons.length ? " — " + c.reasons.join("; ") : ""))}" data-go="${esc(ad.id)}|${p.id}">${inner}</td>`;
   }).join("")}</tr>`).join("");
   const legend = D.placements.map(p => `${esc(p.short)} = ${esc(p.name)}`).join(" · ");

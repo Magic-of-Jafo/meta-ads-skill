@@ -39,7 +39,7 @@ def run(spec_path, out_dir=None, quiet=False):
 def summarize(res, inv, out):
     c = inv["counts"]
     print(f"{len(res['ads'])} ads x {len(res['placements'])} placements: "
-          f"{c.get('ready',0)} ready, {c.get('simulated',0)} simulated, "
+          f"{c.get('actual',0)} actual, {c.get('simulated',0)} simulated, "
           f"{c.get('not_eligible',0)} not eligible, {c.get('excluded',0)} excluded")
     if inv["errors"]:
         print(f"\n{len(inv['errors'])} ERROR(S) - fix before rendering:")

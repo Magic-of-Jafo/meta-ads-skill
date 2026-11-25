@@ -559,7 +559,7 @@ def _choose(cmap: dict, rule: dict, media: dict) -> tuple[str | None, str, float
 
 def plan_placement(ad, p, media, brands, ratios, cfg) -> dict:
     fmt = ad["format"]
-    res = {"status": "ready", "reasons": [], "slots": [], "needs": []}
+    res = {"status": "actual", "reasons": [], "slots": [], "needs": []}
     if p["id"] not in ad["_allowed"]:
         return {"status": "excluded", "reasons": ["excluded by the ad's placements setting"], "slots": [], "needs": []}
     if fmt not in p["formats"]:
@@ -625,7 +625,7 @@ def copy_checks(ad, p) -> list[str]:
 
 def inventory(res: dict, rep: Report) -> dict:
     plist = res["placements"]
-    counts = {"ready": 0, "simulated": 0, "not_eligible": 0, "excluded": 0}
+    counts = {"actual": 0, "simulated": 0, "not_eligible": 0, "excluded": 0}
     unlock: dict[tuple, dict] = {}
     for ad in res["ads"]:
         for p in plist:
@@ -671,7 +671,7 @@ def inventory(res: dict, rep: Report) -> dict:
                 continue
             for p in plist:
                 cell = res["matrix"][ad["id"]][p["id"]]
-                if cell["status"] in ("ready", "simulated"):
+                if cell["status"] in ("actual", "simulated"):
                     rule = p["media"].get(ad["format"]) or p["media"].get("default")
                     want.add(ratio_name(rule["ideal"], res["ratios"]))
         used = sorted(usage.get(mid, ()))
@@ -699,14 +699,14 @@ def inventory(res: dict, rep: Report) -> dict:
     }
 
 
-ICON = {"ready": "✅", "simulated": "⚠️", "not_eligible": "⛔", "excluded": "·"}
+ICON = {"actual": "✅", "simulated": "⚠️", "not_eligible": "⛔", "excluded": "·"}
 
 
 def inventory_md(res: dict, inv: dict) -> str:
     plist = res["placements"]
     L = [f"# Inventory — {res['campaign'].get('name')}", ""]
     c = inv["counts"]
-    L.append(f"{len(res['ads'])} ads × {len(plist)} placements: ✅ {c.get('ready',0)} ready · ⚠️ {c.get('simulated',0)} simulated · ⛔ {c.get('not_eligible',0)} not eligible · · {c.get('excluded',0)} excluded")
+    L.append(f"{len(res['ads'])} ads × {len(plist)} placements: ✅ {c.get('actual',0)} actual · ⚠️ {c.get('simulated',0)} simulated · ⛔ {c.get('not_eligible',0)} not eligible · · {c.get('excluded',0)} excluded")
     L.append(f"\nPlacement specs dated {inv.get('placements_version')}.\n")
     if inv["errors"]:
         L.append("## Errors (must fix before rendering)\n")
@@ -737,7 +737,7 @@ def inventory_md(res: dict, inv: dict) -> str:
         L.append(f"### {ad['id']}{' — ' + ad['label'] if ad.get('label') else ''}\n")
         for p in plist:
             cell = inv["matrix"][ad["id"]][p["id"]]
-            if cell["status"] == "ready" and not cell.get("copy"):
+            if cell["status"] == "actual" and not cell.get("copy"):
                 continue
             bits = cell.get("reasons", []) + cell.get("copy", [])
             if bits:
