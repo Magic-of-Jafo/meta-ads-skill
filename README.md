@@ -55,30 +55,28 @@ claude plugin install meta-ads@meta-ads-skill
 
 ### Option B: as a personal skill
 
-Copy the skill folder into your personal skills directory. It's then invoked as `/meta-ads`.
-
-macOS / Linux:
-
-```bash
-git clone https://github.com/Magic-of-Jafo/meta-ads-skill.git
-mkdir -p ~/.claude/skills && cp -r meta-ads-skill/skills/meta-ads ~/.claude/skills/
-```
-
-Windows (PowerShell):
-
-```powershell
-git clone https://github.com/Magic-of-Jafo/meta-ads-skill.git
-New-Item -ItemType Directory -Force "$HOME\.claude\skills" | Out-Null
-Copy-Item -Recurse meta-ads-skill\skills\meta-ads "$HOME\.claude\skills\"
-```
+Download this repository (on GitHub: **Code → Download ZIP**, or [clone it](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository)), then copy the `skills/meta-ads` folder into your personal skills folder: `~/.claude/skills/` on macOS and Linux, `%USERPROFILE%\.claude\skills\` on Windows. It's then invoked as `/meta-ads`.
 
 Use one option, not both, or you'll have two copies of the skill.
 
 ### Requirements
 
-- **Python 3.9+** with **Pillow**: `pip install pillow`
-- **ffmpeg / ffprobe** on your PATH, for video ads (measuring and cover frames)
-- **Chrome or Edge**, for PNG export. Set `CHROME` to the browser's path if it isn't found automatically.
+- **[Python](https://www.python.org/downloads/) 3.9+** with **[Pillow](https://pillow.readthedocs.io/en/stable/installation/basic-installation.html)**
+- **[ffmpeg / ffprobe](https://ffmpeg.org/download.html)** on your PATH, for video ads (measuring and cover frames)
+- **Chrome or Edge**, for PNG export. If it isn't found automatically, give its path with `--browser`.
+
+## What it runs, sends and fetches
+
+Everything runs locally on your machine. The plugin has no hooks, no MCP servers and no telemetry, and needs no accounts or API keys.
+
+- **Python scripts** in `skills/meta-ads/scripts/`, which Claude runs when you ask for mockups:
+  - `check.py` validates your `ads.json` and writes `inventory.json` and `inventory.md` next to it.
+  - `render.py` copies your media into `meta-ads-output/<campaign>-<date>/` in the current folder and writes the viewer (`index.html`, `data.js`) there.
+  - `export_png.py` saves PNGs into that folder's `png/` subfolder.
+  - `sync_spec.py` is a maintenance script that regenerates tables in the docs.
+- **ffprobe / ffmpeg**, if installed, read video dimensions and save one cover frame per video.
+- **Chrome or Edge, headless**, opens the local `index.html` to take the PNG screenshots, using a temporary profile folder that is deleted afterwards.
+- **Network:** the only network access is downloading media you list in `ads.json` as `http(s)://` URLs. Each file is fetched once with a plain GET into the output folder. Nothing is uploaded or sent anywhere, and the viewer page loads nothing from the web.
 
 ## Try it
 

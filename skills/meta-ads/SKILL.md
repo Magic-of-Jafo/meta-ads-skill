@@ -1,6 +1,6 @@
 ---
 name: meta-ads
-description: Render realistic mockups of Meta ads (Facebook and Instagram) as they'd appear in situ, across 15 placements (FB Feed mobile/desktop, Stories, Reels, Marketplace, Video Feeds, In-stream, Right Column, Search; IG Feed, Stories, Reels, Explore, Explore Home, Profile Feed) for image, video and carousel ads, as an interactive local HTML viewer plus PNGs. Use this whenever someone wants to see, preview, mock up, visualize or compare Facebook/Instagram/Meta ads or ad variants: headlines and copy from a spreadsheet, ads scraped from the Meta Ad Library, competitor ads, draft copy with no creative yet, or "how would this look as a Reel/Story". The skill defines a standard ads.json format (SPEC.md) that the calling agent fills in from whatever it has, then checks what's missing per placement and renders. Not for writing ad copy (ad-creative) or planning campaigns/targeting (ads).
+description: "Render realistic mockups of Meta ads (Facebook and Instagram) as they'd appear in situ, across 15 placements (FB Feed mobile/desktop, Stories, Reels, Marketplace, Video Feeds, In-stream, Right Column, Search; IG Feed, Stories, Reels, Explore, Explore Home, Profile Feed) for image, video and carousel ads, as an interactive local HTML viewer plus PNGs. Use this whenever someone wants to see, preview, mock up, visualize or compare Facebook/Instagram/Meta ads or ad variants: headlines and copy from a spreadsheet, ads scraped from the Meta Ad Library, competitor ads, draft copy with no creative yet, or \"how would this look as a Reel/Story\". The skill defines a standard ads.json format (SPEC.md) that the calling agent fills in from whatever it has, then checks what's missing per placement and renders. Not for writing ad copy (ad-creative) or planning campaigns/targeting (ads)."
 ---
 
 # meta-ads
@@ -58,4 +58,4 @@ The skill never reads spreadsheets, Excel files, briefs or web pages itself. Get
 | `scripts/sync_spec.py` | Regenerate SPEC tables after editing placements.json |
 | `references/placements.md` | Sources, assumptions, fidelity notes, maintenance |
 
-Requirements: Python 3.9+ with Pillow; ffmpeg/ffprobe for video measuring and posters; Chrome or Edge for PNG export (set `CHROME` to the executable if it isn't found).
+Requirements: Python 3.9+ with Pillow; ffmpeg/ffprobe for video measuring and posters; Chrome or Edge for PNG export (pass `--browser PATH` to export_png.py if it isn't found).

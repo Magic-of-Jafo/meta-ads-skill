@@ -24,9 +24,12 @@ if hasattr(sys.stdout, "reconfigure"):
 KEY = (1, 254, 2)  # export-mode page background, trimmed away
 
 
-def find_browser():
-    cands = [os.environ.get("CHROME"),
-             r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+def find_browser(explicit=None):
+    if explicit:
+        if os.path.exists(explicit):
+            return explicit
+        sys.exit(f"--browser path not found: {explicit}")
+    cands = [r"C:\Program Files\Google\Chrome\Application\chrome.exe",
              r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
              r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
              r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
@@ -36,7 +39,7 @@ def find_browser():
     for c in cands:
         if c and os.path.exists(c):
             return c
-    sys.exit("No Chrome/Edge found. Set the CHROME environment variable to the browser executable.")
+    sys.exit("No Chrome/Edge found. Pass the browser executable with --browser PATH.")
 
 
 def load_data(out):
@@ -86,6 +89,7 @@ def main():
     ap.add_argument("--scale", type=float, default=2.0, help="device pixel ratio (2 = retina-sharp)")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--all-cards", action="store_true", help="carousels in Stories/Reels: one PNG per card")
+    ap.add_argument("--browser", help="path to Chrome/Edge, if it isn't found automatically")
     a = ap.parse_args()
 
     out = Path(a.out).resolve()
@@ -132,7 +136,7 @@ def main():
         return
     png_dir = out / "png"
     png_dir.mkdir(exist_ok=True)
-    browser = find_browser()
+    browser = find_browser(a.browser)
     tmp = Path(tempfile.mkdtemp(prefix="metaads-chrome-"))
     profiles = [tmp / f"p{i}" for i in range(max(1, a.workers))]
     print(f"Exporting {len(jobs)} PNG(s) with {Path(browser).name} ...")
