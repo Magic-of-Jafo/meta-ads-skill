@@ -23,6 +23,19 @@ A Claude Code skill that turns ad information (copy, headlines, CTAs, images, vi
 - **Copy-first.** Ads can use placeholder creative, so you can judge copy before any image exists.
 - **Shared media.** Each unique image is listed once and referenced by any number of ads. 100 ads using one image means one file.
 
+## See what your competitors are running
+
+The [Meta Ad Library](https://www.facebook.com/ads/library/) is Meta's public archive of the ads that brands are running right now. Give your agent a brand's Ad Library page and it can bring those ads into the viewer, so you see them the way customers do: in the feed, as Stories and Reels, on desktop. That's a far quicker read than the Library's own small previews. Then put them next to yours.
+
+Things you can ask for:
+
+- *"Here's [competitor]'s Ad Library page: [link]. Pull their active ads and show me how they look in the feed."*
+- *"Which hooks and offers are [competitor] testing right now? Show their ads side by side as Instagram Stories."*
+- *"Put my three draft ads next to [competitor]'s current ads in Compare ads, Facebook Feed."*
+- *"I have headlines in this spreadsheet and no images yet. Mock them up with placeholders."*
+
+Each brand gets its own name and logo in the mockups, and the Filter menu narrows the viewer to one brand. The skill itself doesn't fetch anything from the Ad Library. Your agent collects the ads with whatever tools it has (a browser, or an export you saved) and writes them into the skill's format. Meta's image links expire within days, so the agent saves the media locally.
+
 ## How it works
 
 The skill defines a format (`ads.json`, documented in [`skills/meta-ads/SPEC.md`](skills/meta-ads/SPEC.md)). The agent using the skill converts whatever it has (a spreadsheet, notes, an Ad Library export) into that format itself. The skill then checks it and renders:
