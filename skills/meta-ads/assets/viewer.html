@@ -931,9 +931,11 @@ function libCtl(){
   const shared = D.share ? `<span class="fixed" style="cursor:help" title="A single-file copy made ${esc((D.share.created || "").replace("T", " "))}, for review. These are mockups, not live ads.${D.share.videos_as_frames ? " Videos are shown as their cover frame, to judge layout, text and margins." : ""}">Shared copy${D.share.videos_as_frames ? " · videos as still frames" : ""}</span>` : "";
   const title = `<h1>${esc(D.campaign.name || "Ad mockups")}</h1>${shared}`;
   const libs = (LIBS && LIBS.libraries || []).filter(l => l.rendered);
-  if (!LIB_ID || libs.length < 2) return title;
+  if (!LIB_ID || !LIBS) return title;
+  const home = `<a class="ib" href="../../index.html" title="All libraries, with what's in each">All libraries</a>`;
+  if (libs.length < 2) return `${title}${home}`;
   if (!libs.some(l => l.id === LIB_ID)) libs.unshift({id: LIB_ID, name: D.campaign.name || LIB_ID, ads: D.ads.length});
-  return `<div class="fld"><span class="lb" style="cursor:help" title="Each library is its own set of ads, kept in its own folder. Switching keeps your view and overlays.">Library</span><select data-lib aria-label="Library" class="libsel">${libs.map(l => `<option value="${esc(l.id)}" ${l.id === LIB_ID ? "selected" : ""}>${esc(l.name)} (${l.ads} ad${l.ads === 1 ? "" : "s"})</option>`).join("")}</select><a class="ib" href="../../index.html" title="All libraries, with what's in each">All libraries</a></div>`;
+  return `<div class="fld"><span class="lb" style="cursor:help" title="Each library is its own set of ads, kept in its own folder. Switching keeps your view and overlays.">Library</span><select data-lib aria-label="Library" class="libsel">${libs.map(l => `<option value="${esc(l.id)}" ${l.id === LIB_ID ? "selected" : ""}>${esc(l.name)} (${l.ads} ad${l.ads === 1 ? "" : "s"})</option>`).join("")}</select>${home}</div>`;
 }
 function switchLibrary(id){
   if (!id || id === LIB_ID) return;
