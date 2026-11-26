@@ -30,9 +30,41 @@ Keep separate sets of ads apart: your drafts, each competitor, each campaign. Ev
 
 Ask for it in plain words: *"Start a mockup library called Acme competitors with their current ads"*, *"Add these two drafts to my Spring launch library"*. The agent creates and fills the folders, following the layout in [`SKILL.md`](skills/meta-ads/SKILL.md#libraries).
 
-Your original documents are read once, when the agent builds the library. After that, each library's **copy lives in a spreadsheet**, `ads.xlsx`, made on its first render: one row per ad, with character counts that turn red past what Facebook Feed shows and dropdowns for the button and brand. Edit the wording there and save. In Chrome or Edge, the viewer's **Copy** menu can connect to the sheet (you pick the library folder once per browser session), and the mockups then update a few seconds after each save in Excel, with no re-render. Otherwise ask for a re-render (Excel can stay open).
+Each library's wording lives in a spreadsheet you can edit in Excel or right in the viewer: see [Editing your ad copy](#editing-your-ad-copy).
 
-Or edit right in the viewer: click **Edit copy**, then click any text in a mockup. A side panel opens with that ad's copy and live character counts; the mockups change as you type and the sheet is saved a second later, changing only the cells you edited. The first save of a session backs the sheet up to `backups/`, Undo takes back your last change, and if Excel has the sheet open the panel waits until you close it. New ads get their rows automatically and your edits are never overwritten. Images and brands are still set up by the agent.
+## Editing your ad copy
+
+**Why a spreadsheet.** Your original documents (a Google Sheet, a brief, notes) are read once, when the agent builds the library. From then on the words live in one place: the library's `ads.xlsx`, made on its first render. Edit the copy there, in Excel or in the viewer; both change the same file. Images, brands and placements stay with the agent.
+
+### In Excel
+
+1. Open the sheet from the viewer: the **Copy** menu (top left) shows its full path; click it to open it in Excel. It's also at `meta-ads/<library>/ads.xlsx`.
+2. One row per ad, and a **Cards** tab for carousel cards. The length columns turn red past what Facebook Feed shows before "See more", and **Button** and **Brand** are dropdowns. Alt+Enter makes a line break; emoji are fine. Leave the grey columns alone (ID, Format, Source): the ID links the row to its ad. You can add columns of your own.
+3. Save (Ctrl+S). To see the change, connect the viewer (next) or ask Claude to re-render.
+
+### Connect the viewer to the sheet
+
+Connected, the viewer follows the sheet: each time you save in Excel, the mockups update within a few seconds, with no re-render. Do it once per browser session, in Chrome or Edge:
+
+1. **Copy** menu → **Connect to ads.xlsx…**
+2. A folder dialog opens. The library folder's path is already copied: click the dialog's address bar, paste (Ctrl+V), press Enter, then **Select Folder**, and allow it.
+3. The menu now reads **Copy: ads.xlsx · live**.
+
+After you reload the page, **Copy** → **Load the latest copy** reconnects with one click. Why the dialog: browsers never let a web page open a folder on its own, even on your own computer, so you hand it the folder. The viewer reads only `ads.xlsx` from it.
+
+### In the viewer
+
+1. Click **✎ Edit copy** at the top and allow saving to the folder (once per session; if the viewer isn't connected yet, it asks for the folder as above).
+2. Click any text in a mockup: the primary text, headline, description or button. A panel opens on the right with that ad and that field ready.
+3. Type. That ad's mockups update as you pause, and the sheet is saved a second later: the panel says **Saved to ads.xlsx at …**. Use **‹ ›** to step through ads, **Undo** to take back the last change, and **Done** to finish.
+
+Only the cells you edit change; your formatting, dropdowns and own columns stay as they are. Before the first save of each session, a copy of the sheet goes to the library's `backups/` folder.
+
+**One editor at a time.** If Excel has the sheet open, the panel shows *Waiting to save* and keeps your edits; close Excel without saving there, and they're saved. Saving in Excel while the panel has unsaved edits would replace them with Excel's copy.
+
+### What still needs Claude
+
+New ads, images, brands and placements: ask Claude, and it re-renders. New ads get their rows in the sheet automatically, and rows you've edited are never overwritten. When you ask Claude for a PDF or PowerPoint after editing, the Export menu's request tells it to re-render first.
 
 ## Export: a file to send, a PDF or a PowerPoint
 
