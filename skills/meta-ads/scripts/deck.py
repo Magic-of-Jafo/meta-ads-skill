@@ -189,7 +189,8 @@ def img_size(p):
 
 # ------------------------------------------------------------------ layout (shared by PDF and PowerPoint)
 # The viewer's Save PDF and Save PowerPoint (assets/viewer.html: deckPlan, deckLayout, pptxFiles)
-# lay out and write the same deck in JavaScript. Change one, change the other.
+# lay out and write the same deck in JavaScript. Change one, change the other. Deliberate
+# differences there: JPEG pictures, exact line spacing (matching the PDF), letter-spaced caps.
 def est_h(text, w, size, bold=False, lh=1.25):
     """Rough height of wrapped text (Segoe UI averages ~0.5 em per character, bold ~0.55)."""
     per_line = max(1, int(w / (size * (0.53 if bold else 0.47))))
