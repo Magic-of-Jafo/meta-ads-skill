@@ -63,7 +63,10 @@ details.menu[open] > summary{border-color:var(--ui-accent)}
 .pop .expin{font:inherit;font-size:12px;padding:5px 7px;border:1px solid var(--ui-line);border-radius:6px;background:var(--ui-bg);color:var(--ui-text);width:100%;resize:vertical}
 .pop details.expask > summary{cursor:pointer;font-size:12px;color:var(--ui-sub)}
 .pop details.expask > * + *{margin-top:8px}
-.pop a.expf{color:var(--ui-accent);font-size:12px;overflow-wrap:anywhere}
+.pop .expf{display:flex;align-items:flex-start;gap:4px;font-size:12px}
+.pop .expf > a:first-child{color:var(--ui-accent);overflow-wrap:anywhere;flex:1;min-width:0}
+.pop .expf .fi,.fi{flex:none;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin-top:-4px;border-radius:6px;color:var(--ui-sub)}
+.pop .expf .fi:hover{background:var(--ui-bg);color:var(--ui-text)}
 .pop{max-height:calc(100vh - 120px);overflow-y:auto;overflow-x:hidden}
 .selbar{background:color-mix(in srgb,var(--ui-accent) 10%,var(--ui-panel));border:1px solid color-mix(in srgb,var(--ui-accent) 40%,var(--ui-line));border-radius:8px;padding:6px 10px}
 .selbar b{font-size:13px}
@@ -1008,7 +1011,19 @@ function expRequest(adsF){
   if (EXP.fmt === "file") return `Export the “${name}” mockups as a single shareable file with the meta-ads skill: share.py "${viewer}"${ids}`;
   const pls = EXP.layout === "concept" ? EXP.pls.filter(Boolean) : [EXP.one || state.pl];
   const title = (EXP.title || name).replace(/"/g, "'");
-  return `Export the “${name}” mockups as ${EXP.fmt === "pdf" ? "a PDF" : "a PowerPoint"} with the meta-ads skill: deck.py quick --library "${lib}" --format ${EXP.fmt} --layout ${EXP.layout} --placements ${pls.join(",")}${ids} --title "${title}"`;
+  return `Export the “${name}” mockups as ${EXP.fmt === "pdf" ? "a PDF" : "a PowerPoint"} with the meta-ads skill: deck.py quick --library "${lib}" --format ${EXP.fmt} --layout ${EXP.layout} --placements ${pls.join(",")}${ids} --title "${title}"${state.dark ? " --dark" : ""}`;
+}
+/* An exported file, with Open and Show folder buttons like Chrome's downloads. A browser can't
+   show a PowerPoint file, so a plain link to one downloads it again; Office's own link type
+   (ms-powerpoint:, what SharePoint's "Open in app" uses) opens it in PowerPoint instead. A page
+   can't open File Explorer, so the folder button shows the browser's list of the folder. */
+const IC_OPEN = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>`;
+const IC_FOLDER = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg>`;
+function exportRow(base, f){
+  const url = new URL(base + f.split("/").map(encodeURIComponent).join("/"), location.href).href;
+  const name = f.split("/").pop(), ppt = /\.pptx?$/i.test(name);
+  const open = ppt ? `href="ms-powerpoint:ofe|u|${esc(url)}" title="Open in PowerPoint"` : `href="${esc(url)}" target="_blank" rel="noopener" title="Open in a new tab"`;
+  return `<div class="expf"><a ${open}>${esc(name)}</a><a class="fi" ${open} aria-label="Open ${esc(name)}">${IC_OPEN}</a><a class="fi" href="${esc(url.slice(0, url.lastIndexOf("/") + 1))}" target="_blank" rel="noopener" title="Show the folder" aria-label="Show the folder of ${esc(name)}">${IC_FOLDER}</a></div>`;
 }
 function exportBody(adsF){
   const ads = expAds(adsF);
@@ -1065,7 +1080,7 @@ function exportBody(adsF){
     <div class="fld" style="justify-content:flex-start"><button class="ib" data-copy ${(EXP.fmt === "file" ? expRequest(adsF) : req) ? "" : "disabled"}>Copy request</button></div>`;
   return `<p class="eh" style="margin-top:0">Format</p>
     <span class="seg segsm">${[["file", "File (.html)"], ["pdf", "PDF"], ["pptx", "PowerPoint"]].map(([v, l]) => `<button data-expfmt="${v}" class="${EXP.fmt === v ? "on" : ""}">${l}</button>`).join("")}</span>
-    <p class="note" style="margin:0">${EXP.fmt === "file" ? "One file with every mockup inside. It opens on any computer with a double-click. Videos show as still frames." : EXP.fmt === "pdf" ? "A designed slide deck: cover, your slides, and a closing note on what the mockups are." : "The same deck as an editable PowerPoint, with the full ad text in the speaker notes."}</p>
+    <p class="note" style="margin:0">${EXP.fmt === "file" ? "One file with every mockup inside. It opens on any computer with a double-click. Videos show as still frames." : EXP.fmt === "pdf" ? "A designed slide deck: cover, your slides, and a closing note on what the mockups are." : "The same deck as an editable PowerPoint, with the full ad text in the speaker notes."}${EXP.fmt === "file" ? "" : ` The mockups are in ${state.dark ? "dark" : "light"} mode, as you have the viewer now.`}</p>
     <p class="eh">Ads</p>
     ${radio("scope", "this", "This ad", cur ? esc(clip(adOptionText(cur), 60)) : "")}
     ${radio("scope", "shown", `All ${adsF.length} ad${adsF.length === 1 ? "" : "s"} shown`, nFiltersNow() ? "As filtered by Filter." : "")}
@@ -1073,7 +1088,7 @@ function exportBody(adsF){
     ${pick}
     ${deckOpts}
     ${make}
-    ${files.length ? `<p class="eh">Already exported</p>${files.slice(0, 6).map(f => `<a href="../${f.split("/").map(encodeURIComponent).join("/")}" class="expf">${esc(f.split("/").pop())}</a>`).join("")}` : ""}`;
+    ${files.length ? `<p class="eh">Already exported</p>${files.slice(0, 6).map(f => exportRow("../", f)).join("")}` : ""}`;
 }
 /* Save as file, in the browser. A page opened from a local file can't read its own images, so
    render.py writes each image (scaled) and each video's cover frame as a small script in embed/,
@@ -1295,12 +1310,13 @@ async function deckPrepare(ads, onStep){
   const old = document.title;
   const clean = () => { if (cleaned) return; cleaned = true; document.title = old; deck.remove(); style.remove(); removeEventListener("afterprint", clean); };
   try {
-    // 1. each mockup once, drawn as for a screenshot (light, no overlays, first card), and measured
+    // 1. each mockup once, drawn as for a screenshot (light or dark as the viewer is set; no
+    //    overlays; first card), and measured
     onStep("Drawing mockups…");
     const keys = new Set();
     slides.forEach(s => (s.layout === "concept" ? s.pls.map(pl => s.ad.id + "|" + pl) : (s.items || s.sides.flatMap(sd => sd.items)).map(a => a.id + "|" + s.pl)).forEach(k => keys.add(k)));
     const keep = {export: state.export, dark: state.dark, badges: state.badges, safe: state.safe, trunc: state.trunc, frame: state.frame, card: state.card};
-    Object.assign(state, {export: true, dark: false, badges: false, safe: false, trunc: false, frame: false, card: 0});
+    Object.assign(state, {export: true, badges: false, safe: false, trunc: false, frame: false, card: 0});
     const nodes = new Map();
     try {
       for (const k of keys) {

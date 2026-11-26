@@ -47,6 +47,10 @@ The **Export** menu sets the format, which ads (this one, all shown, or your sel
 
 **Save PowerPoint** builds the `.pptx` in the viewer and asks where to save it. Nothing needs installing.
 
+The mockups on the slides are in light or dark mode, whichever you have the viewer in.
+
+Files already in the library's `exports/` folder are listed in the Export menu and on the libraries page, each with **Open** and **Show folder** buttons. PDFs and shared files open in a new tab; PowerPoint files open in PowerPoint (the browser asks the first time). Show folder lists the folder in the browser, since a web page can't open File Explorer.
+
 Both menus also offer a request to copy and paste to Claude, if you'd rather have Claude save the deck in the library's `exports/` folder with an editable deck file. You can also just ask: *"Make a PDF deck of the three hooks in the Spring launch library."*
 
 Simulated mockups are labelled on the slides. A deck Claude makes also saves a `.deck.json` file; edit its titles or slide order and ask Claude to rebuild it.

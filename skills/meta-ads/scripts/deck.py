@@ -3,7 +3,7 @@
 Usage:
     python deck.py quick --library DIR --ads A1,A2 [--layout concept|lineup|versus]
                          [--placements fb_feed_mobile,ig_feed,ig_reels] [--format pdf,pptx]
-                         [--title "..."] [--subtitle "..."]
+                         [--title "..."] [--subtitle "..."] [--dark]
     python deck.py build DECK.json [--format pdf,pptx]
 
 --library is a library folder (meta-ads/<library>, with ads.json and viewer/) or a viewer
@@ -15,6 +15,9 @@ Layouts:
   lineup   ads side by side in one placement (the first of --placements), up to 4 per slide
   versus   brand against brand in one placement: the chosen ads must come from exactly two
            brands; up to 3 ads per side per slide
+
+--dark draws the mockups in the apps' dark mode (a deck file stores it as "dark": true); the
+viewer adds it when the user has the viewer in dark mode.
 
 Every deck gets a cover and a closing "about these mockups" slide. Output goes to the
 library's exports/ folder (or next to the deck file for `build`). The PDF is printed by
@@ -135,14 +138,15 @@ def fmt_label(ad):
 class Shots:
     """Collects (library, ad, placement) mockups, renders the missing ones once, in parallel."""
 
-    def __init__(self, build_dir, browser=None):
+    def __init__(self, build_dir, browser=None, dark=False):
         self.dir = build_dir
         self.dir.mkdir(parents=True, exist_ok=True)
         self.want = {}
         self.browser = browser
+        self.dark = dark
 
     def path(self, lib, ad_id, pl):
-        key = hashlib.sha1(f"{lib.viewer}|{lib.stamp}|{ad_id}|{pl}".encode()).hexdigest()[:20]
+        key = hashlib.sha1(f"{lib.viewer}|{lib.stamp}|{ad_id}|{pl}{'|dark' if self.dark else ''}".encode()).hexdigest()[:20]
         p = self.dir / f"{key}.png"
         self.want[p] = (lib, ad_id, pl)
         return p
@@ -161,7 +165,7 @@ class Shots:
             for i, (p, (lib, ad_id, pl)) in chunk:
                 place = lib.pl[pl]
                 url = (lib.viewer / "index.html").as_uri() + "#export&ad=" + urllib.parse.quote(ad_id) + \
-                    f"&pl={pl}&card=0&dark=0&badges=0&safe=0&trunc=0"
+                    f"&pl={pl}&card=0&dark={1 if self.dark else 0}&badges=0&safe=0&trunc=0"
                 w = 1280 if place["device"] == "desktop" else 393
                 h = 852 if place["template"] in FULLSCREEN else 2600
                 try:
@@ -588,7 +592,7 @@ def write_pptx(pages, theme, out_pptx):
 def build(deck, deck_dir, out_base, formats, browser=None):
     theme = {**THEME, **(deck.get("theme") or {})}
     build_dir = out_base.parent / ".build"
-    shots = Shots(build_dir, browser)
+    shots = Shots(build_dir, browser, bool(deck.get("dark")))
     pages = layout(deck, deck_dir, shots)
     made = []
     if "pdf" in formats:
@@ -646,6 +650,8 @@ def cmd_quick(a):
                            "sides": [{"label": lib.brand(lib.ads[s1[0]]), "ads": s1}, {"label": lib.brand(lib.ads[s2[0]]), "ads": s2}]})
     title = a.title or lib.name
     deck = {"deck_version": 1, "title": title, "subtitle": a.subtitle or "", "library": ref, "slides": slides}
+    if a.dark:
+        deck["dark"] = True
     exports = lib_dir / "exports"
     exports.mkdir(exist_ok=True)
     base = exports / f"{slug(title)}-{a.layout}-{dt.date.today().isoformat()}"
@@ -675,6 +681,7 @@ def main():
     q.add_argument("--placements", help="comma-separated placement IDs")
     q.add_argument("--title")
     q.add_argument("--subtitle")
+    q.add_argument("--dark", action="store_true", help="mockups in the apps' dark mode")
     b = sub.add_parser("build", help="build an existing .deck.json")
     b.add_argument("deck")
     for p in (q, b):
