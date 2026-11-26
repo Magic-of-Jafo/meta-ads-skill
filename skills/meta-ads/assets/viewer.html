@@ -2100,7 +2100,7 @@ async function edStart(){
     if (SHEET.status !== "live") { await sheetLoad(true); if (SHEET.status !== "live") return; startSheetPoll(); }
   }
   EDIT.on = true; EDIT.msg = ""; EDIT.tone = "";
-  if (!EDIT.id && (state.mode === "feed" || state.mode === "gallery")) EDIT.id = state.ad;
+  if (state.mode === "feed" || state.mode === "gallery") EDIT.id = state.ad;   // start on the ad on show
   renderPanel(); go();
 }
 async function edStop(){
@@ -2268,6 +2268,9 @@ function viewMatrix(){
 function go(){
   const inList = filteredAds();
   if (inList.length && !inList.some(a => a.id === state.ad)) { state.ad = inList[0].id; state.card = 0; }
+  // In the one-ad views the editor follows the ad on show (Ad picker, ‹ ›, arrow keys); in Compare ads
+  // and Overview a click on a mockup chooses it.
+  if (EDIT.on && (state.mode === "feed" || state.mode === "gallery") && EDIT.id !== state.ad) { EDIT.id = state.ad; renderPanel(); }
   writeHash();
   document.documentElement.dataset.theme = state.dark ? "dark" : "light";
   toolbar();
