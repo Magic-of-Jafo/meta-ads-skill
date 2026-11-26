@@ -7,7 +7,9 @@ description: "Render realistic mockups of Meta ads (Facebook and Instagram) as t
 
 Turns ad information into in-situ mockups of Facebook and Instagram ads. You (the invoking agent) translate whatever you have into one `ads.json` file; the skill validates it, tells you what's missing for each placement, and renders.
 
-The skill never reads spreadsheets, Excel files, briefs or web pages itself. Getting data out of those sources is your job, because only you know their shape (and sources like the Ad Library change over time). `SPEC.md` tells you exactly what to produce.
+The skill never reads the user's spreadsheets, briefs or web pages itself. Getting data out of those sources is your job, because only you know their shape (and sources like the Ad Library change over time). `SPEC.md` tells you exactly what to produce.
+
+**The user's originals are read once.** You convert them into a library; from then on the library is where the ads live. Its copy (the words) is in `ads.xlsx`, a spreadsheet the user edits in Excel, which render.py creates on the library's first render. Its setup (images, brands, placements, formats) is in `ads.json`. Don't go back to the original documents for copy unless the user asks you to re-import.
 
 ## Libraries
 
@@ -18,8 +20,8 @@ meta-ads/
   index.html          generated home page listing every library (open this to pick one)
   libraries.js        generated list of libraries; its presence marks the root
   <library>/          one folder per library, named by library.py (lowercase, hyphens)
-    ads.json          the library's spec. You and the user edit this; it's the source of truth.
-    ads.xlsx          optional: the ad copy as a spreadsheet for the user (sheet.py). When present, its text wins over ads.json's.
+    ads.json          the library's setup: brands, media, ads (IDs, formats, creative, placements). Its copy fields are the starting copy.
+    ads.xlsx          the ad copy: the user's file and the master for the words. Created by the first render; its text wins over ads.json's.
     backups/          earlier copies of ads.xlsx, made before a --fresh rebuild
     assets/           the library's source images and videos. Paths in ads.json point here (assets/hero.jpg).
     inventory.*       written by check.py
@@ -29,12 +31,15 @@ meta-ads/
 
 - **Which library?** If the user names one, use it. Otherwise run `python "${CLAUDE_SKILL_DIR}/scripts/library.py" list` and ask which to add to, or whether to start a new one. Don't mix unrelated sets of ads in one library just because it exists. One library can hold several brands (your drafts next to a competitor's), so put ads the user wants to compare side by side in the same library.
 - **New library**: `python "${CLAUDE_SKILL_DIR}/scripts/library.py" new "Acme competitors"`. It creates the root if needed, `meta-ads/acme-competitors/` and its `assets/`. Then write `ads.json` there, with `campaign.name` set to the library's display name.
-- **Add to or update a library**: edit its `ads.json` (append ads, swap placeholders for real creative), save any new media into its `assets/`, then check and render it again. The viewer updates in place.
-- **Copy sheet** (`ads.xlsx`): `python "${CLAUDE_SKILL_DIR}/scripts/sheet.py" export <library folder>` writes the library's copy to a spreadsheet the user can edit in Excel: an Ads tab (one row per ad: name, group, brand, primary text, headline, description, button, links, notes), a Cards tab for carousel cards, length counts that turn red past what Facebook Feed shows, and dropdowns for Button and Brand. Images, brands and placements stay in `ads.json`.
-  - When `ads.xlsx` exists, check.py and render.py read it and its copy wins over `ads.json`'s, cell by cell. So read the copy from the sheet, not from `ads.json`, whose copy fields may be out of date; and change copy in the sheet (with openpyxl, or ask the user to), never only in `ads.json`, or the sheet will override it.
+- **Add to or update a library**: add ads or change setup in its `ads.json` (append ads, swap placeholders for real creative), save any new media into its `assets/`, then check and render it again. The render gives new ads their rows in `ads.xlsx` (with the copy you wrote in `ads.json`) and never changes existing rows. The viewer updates in place.
+- **Change copy** in the sheet, not in `ads.json`: `python "${CLAUDE_SKILL_DIR}/scripts/sheet.py" set <library folder> <ad ID> <field> "<text>"` (fields: label, group, brand, primary_text, headline, description, cta, display_link, destination_url, notes; `--card N` for a carousel card; `\n` for a line break), then render. A change made only in `ads.json` is overridden by the sheet; check.py and render.py warn when they see one.
+- **Read copy** with `python "${CLAUDE_SKILL_DIR}/scripts/sheet.py" show <library folder> [--ad ID]`, which prints what the mockups use. `ads.json`'s copy fields may be out of date.
+- **The copy sheet** (`ads.xlsx`) has an Ads tab (one row per ad: name, group, brand, primary text, headline, description, button, links, notes), a Cards tab for carousel cards, length counts that turn red past what Facebook Feed shows, and dropdowns for Button and Brand. Grey columns (ID, Format, Source) are information only. The user may reorder columns and add their own.
+  - check.py and render.py read it and its copy wins over `ads.json`'s, cell by cell.
   - The scripts read the sheet as last saved, even while it's open in Excel: the user saves (Ctrl+S) and you re-render. Unsaved changes in Excel aren't seen.
-  - After adding ads to `ads.json`, run `sheet.py export` again: with an existing sheet it only adds rows for the new ads and changes nothing else. `--fresh` rebuilds the sheet from the current copy (backing up the old one to `backups/`); it keeps the text but drops columns and formatting the user added, so use it only when the user asks.
-  - Writing the sheet (`export`) fails while it's open in Excel: ask the user to close it, then run the command again.
+  - Writing the sheet (`sheet.py set`, or render adding rows) fails while it's open in Excel. The render still finishes and says so; ask the user to close Excel, then run it again.
+  - `python "${CLAUDE_SKILL_DIR}/scripts/sheet.py" export <library folder>` makes or extends the sheet by hand (the render does this already). `--fresh` rebuilds it from the current copy (backing up the old one to `backups/`); it keeps the text but drops columns and formatting the user added, so use it only when the user asks.
+  - `render.py --no-sheet` skips the sheet, for a library the user wants kept in `ads.json` only.
 - **Rename or remove**: the display name is `campaign.name` (edit it and re-render). To remove a library, delete its folder (after confirming with the user), then run `library.py index` to update the home page. Do the same after renaming a folder by hand.
 - **Bring in an older render** from `meta-ads-output/`: make a library, copy that folder's `ads.snapshot.json` into it as `ads.json` and its `media/` files into `assets/`, change `media/` to `assets/` in the paths, then render.
 - Use `--root DIR` with library.py only when the user wants the libraries somewhere else. render.py finds the root on its own from where `ads.json` sits.
@@ -47,13 +52,14 @@ meta-ads/
    - List each unique image/video once under `media` and reference it by ID from every ad that uses it. Ads with no creative yet get a `placeholder` media entry describing the intended image.
    - Give every brand an `avatar`: the page's real profile picture (see SPEC.md §4 for where to find it), or, only if you can't get it, an explicit 1:1 `placeholder`. A missing avatar is an error.
    - Copy text verbatim. Leave out what you don't know instead of inventing it; the check reports gaps.
+   - Record where each ad came from in `source` (sheet and row, Ad Library ID, file name). The copy sheet shows it, so the user can trace a row back to the original.
    - Save remote media (especially Meta CDN links, which expire within days) into the library's `assets/` folder and point `src` at them.
 
 3. **Check**: `python "${CLAUDE_SKILL_DIR}/scripts/check.py" ads.json`
    Fix all errors. Then look at the summary, `unlock` list and `shopping_list` (in `inventory.json` / `inventory.md`). If something important is missing (copy, a 9:16 version, an avatar), ask the user whether to supply it or render with placeholders now. Placeholders are a valid choice: the user may want to judge copy before creatives exist.
 
 4. **Render**: `python "${CLAUDE_SKILL_DIR}/scripts/render.py" ads.json`
-   For a library's `ads.json`, the viewer goes to `<library>/viewer/` and the root's home page and library list are refreshed. Re-rendering updates the same folder; stored media is reused.
+   For a library's `ads.json`, the viewer goes to `<library>/viewer/` and the root's home page and library list are refreshed. Re-rendering updates the same folder; stored media is reused. The first render also creates the library's copy sheet, `ads.xlsx`; later renders add rows for new ads.
    A spec that isn't in a library (a one-off check, the bundled examples) renders to `./meta-ads-output/<campaign>-<date>/` in your working directory, with an `ads.snapshot.json` copy of the spec, and no Library menu. Use `--out DIR` only if the user asks for another location.
 
 5. **PNGs (when useful)**: `python "${CLAUDE_SKILL_DIR}/scripts/export_png.py" <output folder> [--ads A1,A2] [--placements ig_reels,fb_feed_mobile] [--dark] [--safe] [--limits] [--badges] [--all-cards]`
@@ -70,7 +76,7 @@ meta-ads/
      - Open the PDF and look at it before handing it over.
    - **Requests pasted from the viewer:** the Export menu gives the user a request such as *Export the "X" mockups as a PDF with the meta-ads skill: deck.py quick --library "D:/…/meta-ads/x" --format pdf --layout concept --placements … --ads … --title "…"*. Run exactly that command with the skill's script path, then give the user the output paths.
 
-7. **Present**: give the user the path to the library's `viewer/index.html` (it opens offline by double-click), mention `meta-ads/index.html` when there's more than one library, and summarize the inventory: how many mockups are actual or simulated, and the top unlocks.
+7. **Present**: give the user the path to the library's `viewer/index.html` (it opens offline by double-click), mention `meta-ads/index.html` when there's more than one library, and summarize the inventory: how many mockups are actual or simulated, and the top unlocks. When the render created the copy sheet, tell the user, with its full path, that the ad copy now lives in `ads.xlsx`: they edit the wording there (save, then ask you to re-render), and their original documents are no longer read.
 
 ## What the user gets in the viewer
 
@@ -101,7 +107,7 @@ meta-ads/
 | `scripts/check.py` | Validate + inventory |
 | `scripts/render.py` | Build the viewer (a library's `viewer/`, or a dated output folder) |
 | `scripts/library.py` | Create, list and re-index libraries |
-| `scripts/sheet.py` | The ad copy as `ads.xlsx` for the user to edit; read back by every script |
+| `scripts/sheet.py` | The library's copy sheet `ads.xlsx`: export, show, set; read back by every script |
 | `scripts/share.py` | Single-file copy of a viewer to send to someone |
 | `scripts/deck.py` | Designed PDF and PowerPoint decks from the mockups |
 | `scripts/export_png.py` | Headless Chrome/Edge PNG export |

@@ -2,19 +2,29 @@
 
 Usage:
     python sheet.py export LIBRARY_OR_ADS_JSON [--fresh]
+    python sheet.py show   LIBRARY_OR_ADS_JSON [--ad ID]
+    python sheet.py set    LIBRARY_OR_ADS_JSON AD_ID FIELD TEXT [--card N]
 
-The sheet holds the words: one row per ad (name, group, brand, primary text, headline,
-description, button, links, notes) and a Cards tab for carousel cards. ads.json keeps the setup:
-images, brands, placements. When both have a value, the sheet wins: every script that loads
-ads.json (check.py, render.py) reads ads.xlsx beside it and applies its copy.
+In a library, the sheet is the master for the words; ads.json keeps the setup (images, brands,
+placements, formats). render.py creates the sheet on a library's first render and adds rows for
+new ads on later ones. Every script that loads ads.json (check.py, render.py) reads ads.xlsx beside
+it and applies its copy, cell by cell.
 
-export writes ads.xlsx from ads.json. If ads.xlsx already exists it is the user's file, so export
-only adds rows for ads that aren't in it yet and changes nothing else. --fresh rebuilds it from
-the current copy (the sheet's text over ads.json's), after copying the old sheet to backups/. It
-resets the layout: columns the user added and their formatting are dropped. Use it only when asked.
+  export  writes ads.xlsx from ads.json. If it exists, it only adds rows for ads that aren't in it
+          yet. --fresh rebuilds it from the current copy (the sheet's text over ads.json's), after
+          copying the old sheet to backups/; it drops columns and formatting the user added.
+  show    prints the current copy as JSON (what the mockups use). Read copy this way, not from
+          ads.json, whose copy fields may be out of date.
+  set     changes one field in the sheet and keeps everything else (formatting, the user's own
+          columns). FIELD is one of: label, group, brand, primary_text, headline, description, cta,
+          display_link, destination_url, notes (headline, description, cta, display_link and
+          destination_url with --card N for a carousel card). \n in TEXT is a line break. For cta,
+          give a label ("Book now") or a code (BOOK_NOW); "No button" removes it. An empty TEXT
+          clears the field.
 
 Columns are found by their header text, so the user can reorder them and add columns of their
-own; those are ignored. Format and Source are shown for information and never read back.
+own; those are ignored. Format and Source are shown for information and never read back. Writing
+fails while the sheet is open in Excel (reading works: it sees the last saved version).
 Needs openpyxl: https://openpyxl.readthedocs.io/en/stable/#installation
 """
 import argparse
@@ -32,6 +42,10 @@ if hasattr(sys.stdout, "reconfigure"):
 
 SHEET_NAME = "ads.xlsx"
 INSTALL = "https://openpyxl.readthedocs.io/en/stable/#installation"
+
+
+class SheetError(Exception):
+    """Something the user can fix (close Excel, install openpyxl); the message says what."""
 NO_BUTTON = "No button"
 SAME_AS_AD = ""          # a card's blank Button means "the ad's button"
 
@@ -255,6 +269,15 @@ def apply(spec, spec_path, rep):
                     card["cta"] = code
                     changed.add(aid)
     wb.close()
+    try:
+        json_newer = Path(spec_path).stat().st_mtime > sp.stat().st_mtime + 1
+    except OSError:
+        json_newer = False
+    if changed and json_newer:
+        ids = sorted(changed)
+        rep.warn("ads.xlsx", f"ads.json was saved after ads.xlsx and {len(ids)} ad(s) have different copy in each: "
+                 f"{', '.join(ids[:8])}{'…' if len(ids) > 8 else ''}. The sheet's text is used. "
+                 "To change copy, change it in the sheet (sheet.py set); ads.json's copy is only the starting point.")
     return {"path": str(sp), "ads_changed": len(changed)}
 
 
@@ -376,10 +399,11 @@ def _dropdowns(wb, brands, cta_labels):
                 ws.add_data_validation(dv)
 
 
-def export(target, fresh=False):
+def export(target, fresh=False, quiet=False):
+    """Returns {'path', 'created', 'added': [ad IDs]}."""
     openpyxl = need_openpyxl()
     if openpyxl is None:
-        sys.exit(f"Writing {SHEET_NAME} needs openpyxl: {INSTALL}")
+        raise SheetError(f"Writing {SHEET_NAME} needs openpyxl: {INSTALL}")
     t = Path(target).resolve()
     spec_path = t / "ads.json" if t.is_dir() else t
     with open(spec_path, encoding="utf-8-sig") as f:
@@ -399,22 +423,23 @@ def export(target, fresh=False):
                 warnings.simplefilter("ignore")   # Excel's dropdowns: rebuilt below
                 wb = openpyxl.load_workbook(sp)
         except PermissionError:
-            sys.exit(f"{sp} is open in another program (Excel?). Close it and run this again.")
+            raise SheetError(f"{sp} is open in another program (Excel?). Close it and run this again.")
         ws = wb["Ads"] if "Ads" in wb.sheetnames else None
         if ws is None:
-            sys.exit(f"{sp} has no Ads tab; rename it back to Ads, or rebuild with --fresh")
+            raise SheetError(f"{sp} has no Ads tab; rename it back to Ads, or rebuild with --fresh")
         from openpyxl.styles import Alignment
         from openpyxl.utils import get_column_letter
         wrap = Alignment(wrap_text=True, vertical="top")
         heads = [str(c.value or "").strip().lower() for c in ws[1]]
         if "id" not in heads:
-            sys.exit(f"{sp}: the Ads tab has no ID column")
+            raise SheetError(f"{sp}: the Ads tab has no ID column")
         id_col = heads.index("id") + 1
         have = {str(row[0]).strip() for row in ws.iter_rows(min_row=2, min_col=id_col, max_col=id_col, values_only=True) if row[0] is not None}
         new_ads = [a for a in ads if a["id"] not in have]
         if not new_ads:
-            print(f"{sp} already has every ad; nothing to add.")
-            return sp
+            if not quiet:
+                print(f"{sp} already has every ad; nothing to add.")
+            return {"path": sp, "created": False, "added": []}
         # append in the sheet's own column order; columns the user added stay empty
         order = [next((f for h, f, w, e in AD_COLS if h.lower() == hd), None) for hd in heads]
         start = ws.max_row + 1
@@ -440,22 +465,24 @@ def export(target, fresh=False):
         try:
             wb.save(sp)
         except PermissionError:
-            sys.exit(f"{sp} is open in another program (Excel?). Close it and run this again.")
-        print(f"Added {len(new_ads)} ad(s) to {sp}: {', '.join(a['id'] for a in new_ads)}")
-        return sp
+            raise SheetError(f"{sp} is open in another program (Excel?). Close it and run this again.")
+        if not quiet:
+            print(f"Added {len(new_ads)} ad(s) to {sp}: {', '.join(a['id'] for a in new_ads)}")
+        return {"path": sp, "created": False, "added": [a["id"] for a in new_ads]}
 
     if sp.exists():
         # rebuild from the copy as it is now: the sheet's text over ads.json's
         rep = metaads.Report()
         apply(spec, spec_path, rep)
         for e in rep.errors:
-            sys.exit(f"Can't read the current sheet to keep its edits: {e['message']}")
+            raise SheetError(f"Can't read the current sheet to keep its edits: {e['message']}")
         ads = [a for a in (spec.get("ads") or []) if isinstance(a, dict) and a.get("id")]
         bdir = sp.parent / "backups"
         bdir.mkdir(exist_ok=True)
         b = bdir / f"ads-{dt.datetime.now():%Y-%m-%d-%H%M%S}.xlsx"
         shutil.copy2(sp, b)
-        print(f"Backed up the old sheet to {b}")
+        if not quiet:
+            print(f"Backed up the old sheet to {b}")
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -493,9 +520,110 @@ def export(target, fresh=False):
     try:
         wb.save(sp)
     except PermissionError:
-        sys.exit(f"{sp} is open in another program (Excel?). Close it and run this again.")
-    print(f"Wrote {sp}: {len(ads)} ads{f', {len(card_rows)} carousel cards' if card_rows else ''}")
-    return sp
+        raise SheetError(f"{sp} is open in another program (Excel?). Close it and run this again.")
+    if not quiet:
+        print(f"Wrote {sp}: {len(ads)} ads{f', {len(card_rows)} carousel cards' if card_rows else ''}")
+    return {"path": sp, "created": True, "added": [a["id"] for a in ads]}
+
+
+def _spec_path(target):
+    t = Path(target).resolve()
+    return t / "ads.json" if t.is_dir() else t
+
+
+def show(target, ad_id=None):
+    """The copy as the mockups use it: the sheet's text over ads.json's."""
+    spec, p, rep = metaads.load_spec(_spec_path(target))
+    if spec is None or rep.errors:
+        raise SheetError("; ".join(e["message"] for e in rep.errors) or "can't load the spec")
+    defaults = spec.get("defaults") or {}
+    out = []
+    for a in spec.get("ads") or []:
+        if not isinstance(a, dict) or (ad_id and a.get("id") != ad_id):
+            continue
+        row = {"id": a.get("id")}
+        for f in ("label", "group", "brand", "primary_text", "headline", "description", "cta", "display_link", "destination_url", "notes"):
+            v = _effective(a, defaults, f)
+            if v not in (None, ""):
+                row[f] = v
+        if a.get("cards"):
+            row["cards"] = [{k: c.get(k) for k in CARD_SET_FIELDS if c.get(k) not in (None, "")} for c in a["cards"] if isinstance(c, dict)]
+        out.append(row)
+    if ad_id and not out:
+        raise SheetError(f"no ad with ID '{ad_id}'")
+    sp = sheet_path(p)
+    return {"sheet": str(sp) if sp.exists() else None, "ads": out}
+
+
+SET_FIELDS = {"label": "Ad name", "group": "Group", "brand": "Brand", "primary_text": "Primary text", "headline": "Headline",
+              "description": "Description", "cta": "Button", "display_link": "Display link", "destination_url": "Destination URL", "notes": "Notes"}
+CARD_SET_FIELDS = ("headline", "description", "cta", "display_link", "destination_url")
+
+
+def set_field(target, ad_id, field, text, card=None):
+    """Change one cell of the sheet, keeping everything else. Returns {'path', 'row', 'column'}."""
+    openpyxl = need_openpyxl()
+    if openpyxl is None:
+        raise SheetError(f"Writing {SHEET_NAME} needs openpyxl: {INSTALL}")
+    field = field.strip().lower().replace(" ", "_")
+    field = {"ad_name": "label", "name": "label", "button": "cta"}.get(field, field)
+    if field not in SET_FIELDS or (card and field not in CARD_SET_FIELDS):
+        allowed = CARD_SET_FIELDS if card else SET_FIELDS
+        raise SheetError(f"can't set '{field}'{' on a card' if card else ''}; use one of: {', '.join(allowed)}")
+    spec_path = _spec_path(target)
+    spec = json.loads(spec_path.read_text(encoding="utf-8-sig"))
+    if not any(isinstance(a, dict) and a.get("id") == ad_id for a in spec.get("ads") or []):
+        raise SheetError(f"no ad with ID '{ad_id}' in {spec_path}")
+    sp = sheet_path(spec_path)
+    export(spec_path, quiet=True)    # creates the sheet, or adds the ad's row if it's new
+    cta_labels = metaads.load_placements()["cta"]
+    brands = {k: b for k, b in (spec.get("brands") or {}).items() if isinstance(b, dict)}
+    value = text.replace("\\n", "\n") if text else None
+    if field == "cta" and value:
+        v = value.strip()
+        code = v.upper().replace(" ", "_")
+        if v.lower() in (NO_BUTTON.lower(), "no_button", "none"):
+            value = NO_BUTTON
+        elif code in cta_labels:
+            value = cta_labels[code]
+        elif v.lower() in {l.lower() for l in cta_labels.values()}:
+            value = next(l for l in cta_labels.values() if l.lower() == v.lower())
+        else:
+            raise SheetError(f"'{v}' isn't one of Meta's buttons (see the CTA table in SPEC.md)")
+    if field == "brand" and value:
+        if value in brands:
+            value = brands[value].get("page_name") or value
+        elif value.lower() not in {(b.get("page_name") or "").lower() for b in brands.values()}:
+            raise SheetError(f"no brand '{value}'; brands: {', '.join((b.get('page_name') or k) for k, b in brands.items())}")
+    import warnings
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            wb = openpyxl.load_workbook(sp)
+    except PermissionError:
+        raise SheetError(f"{sp} is open in another program (Excel?). Close it and try again.")
+    tab = "Cards" if card else "Ads"
+    if tab not in wb.sheetnames:
+        raise SheetError(f"{sp} has no {tab} tab")
+    ws = wb[tab]
+    heads = [str(c.value or "").strip().lower() for c in ws[1]]
+    want = SET_FIELDS[field].lower()
+    keys = ("ad id", "card") if card else ("id",)
+    missing = [k for k in (want,) + keys if k not in heads]
+    if missing:
+        raise SheetError(f"the {tab} tab has no '{missing[0]}' column")
+    row = next((r for r in range(2, ws.max_row + 1)
+                if str(ws.cell(r, heads.index(keys[0]) + 1).value or "").strip() == ad_id
+                and (not card or str(ws.cell(r, heads.index("card") + 1).value or "").strip() == str(card))), None)
+    if row is None:
+        raise SheetError(f"no row for ad '{ad_id}'{f' card {card}' if card else ''} in the {tab} tab")
+    _put(ws.cell(row, heads.index(want) + 1), value)
+    _dropdowns(wb, brands, cta_labels)
+    try:
+        wb.save(sp)
+    except PermissionError:
+        raise SheetError(f"{sp} is open in another program (Excel?). Close it and try again.")
+    return {"path": sp, "row": row, "column": SET_FIELDS[field]}
 
 
 def main():
@@ -504,9 +632,26 @@ def main():
     e = sub.add_parser("export", help="write ads.xlsx from ads.json (adds new ads only if it exists)")
     e.add_argument("target", help="a library folder or an ads.json")
     e.add_argument("--fresh", action="store_true", help="rebuild the sheet from the current copy (backs up the old one; drops added columns)")
+    sh = sub.add_parser("show", help="print the current copy (the sheet's text over ads.json's) as JSON")
+    sh.add_argument("target")
+    sh.add_argument("--ad", help="only this ad")
+    st = sub.add_parser("set", help="change one field in the sheet")
+    st.add_argument("target")
+    st.add_argument("ad")
+    st.add_argument("field")
+    st.add_argument("text", help="the new text; \\n for a line break; empty to clear")
+    st.add_argument("--card", type=int, help="a carousel card number (1-based)")
     a = ap.parse_args()
-    if a.cmd == "export":
-        export(a.target, a.fresh)
+    try:
+        if a.cmd == "export":
+            export(a.target, a.fresh)
+        elif a.cmd == "show":
+            print(json.dumps(show(a.target, a.ad), indent=2, ensure_ascii=False))
+        else:
+            r = set_field(a.target, a.ad, a.field, a.text, a.card)
+            print(f"Set {r['column']} of {a.ad}{f' card {a.card}' if a.card else ''} in {r['path']} (row {r['row']}). Re-render to see it.")
+    except SheetError as err:
+        sys.exit(str(err))
 
 
 if __name__ == "__main__":

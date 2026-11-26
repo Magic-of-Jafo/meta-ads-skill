@@ -5,7 +5,9 @@ Usage:
 
 If ads.json is in a library (meta-ads/<library>/ads.json, set up with library.py),
 the viewer goes to <library>/viewer/, re-rendering updates it in place, and the
-library root's home page and library list are refreshed.
+library root's home page and library list are refreshed. The library's copy sheet,
+ads.xlsx, is created on the first render and gets rows for new ads on later ones
+(sheet.py; --no-sheet skips this). From then on its text is what the mockups use.
 
 Otherwise the default output is ./meta-ads-output/<campaign-slug>-<YYYY-MM-DD>/ under
 the current working directory (the invoking agent's workspace). Each unique media
@@ -146,6 +148,7 @@ def main():
     ap.add_argument("spec")
     ap.add_argument("--out", help="output folder (default ./meta-ads-output/<campaign>-<date>)")
     ap.add_argument("--open", action="store_true", help="open the viewer in the default browser")
+    ap.add_argument("--no-sheet", action="store_true", help="don't create or extend the library's ads.xlsx")
     a = ap.parse_args()
 
     spec, spec_path, rep = metaads.load_spec(a.spec)
@@ -250,6 +253,18 @@ def main():
     print(f"  open: {out / 'index.html'}")
     if lib_root:
         print(f"  library home ({len(libs)} librar{'y' if len(libs) == 1 else 'ies'}): {lib_root / 'index.html'}")
+    if lib_root and not a.no_sheet:
+        # the library's copy lives in ads.xlsx: create it, or give new ads their rows (never overwrites)
+        import sheet
+        try:
+            r = sheet.export(spec_path, quiet=True)
+            if r["created"]:
+                print(f"  copy sheet created: {r['path']}")
+                print("    The library's ad copy now lives there: edit it in Excel, then re-render.")
+            elif r["added"]:
+                print(f"  copy sheet: added rows for {', '.join(r['added'])} to {r['path']}")
+        except sheet.SheetError as e:
+            print(f"  copy sheet not updated: {e}")
     if a.open:
         import webbrowser
         webbrowser.open((out / "index.html").as_uri())

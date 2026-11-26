@@ -12,6 +12,7 @@ Contents: [1 Workflow](#1-workflow) · [2 File](#2-file-and-paths) · [3 Top lev
 2. `python <skill-dir>/scripts/check.py ads.json`. Fix every **error**; read the **warnings** and the **unlock** list.
 3. Decide with the user whether to supply missing items (copy, creative ratios, avatar) or render with placeholders as-is.
 4. `python <skill-dir>/scripts/render.py ads.json` writes the viewer to `<library>/viewer/` for a library spec, otherwise to `./meta-ads-output/<campaign>-<date>/` in your current working directory.
+   In a library, the first render also writes `ads.xlsx` beside `ads.json`: the ad copy as a spreadsheet the user edits. From then on the sheet's text wins over the copy fields in `ads.json` (`label`, `group`, `brand`, `primary_text`, `headline`, `description`, `cta`, `display_link`, `destination_url`, `notes`, and the cards' text), so change copy with `scripts/sheet.py set`, not in `ads.json`. Everything else stays in `ads.json`.
 5. Optional: `python <skill-dir>/scripts/export_png.py <that folder>` for PNGs.
 
 ## 2. File and paths
