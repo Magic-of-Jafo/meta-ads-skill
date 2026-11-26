@@ -96,6 +96,7 @@ body.editing #main{margin-right:min(400px,100vw)}
 #edpanel .edtools{display:inline-flex;align-items:center;gap:6px}
 #edpanel .edemo{font:inherit;font-size:15px;line-height:1;width:26px;height:24px;padding:0;border:1px solid var(--ui-line);border-radius:6px;background:var(--ui-bg);cursor:pointer;filter:grayscale(.35)}
 #edpanel .edemo:hover,#edpanel .edemo:focus-visible{filter:none;border-color:var(--ui-accent)}
+#edpanel .emtarget{outline:2px solid var(--ui-accent);outline-offset:1px}
 #edemoji{position:fixed;z-index:90;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
 #edpanel input,#edpanel textarea,#edpanel select{font:inherit;font-weight:400;font-size:13px;line-height:1.4;padding:6px 8px;border:1px solid var(--ui-line);border-radius:6px;background:var(--ui-bg);color:var(--ui-text);width:100%}
 #edpanel textarea{resize:vertical}
@@ -1994,7 +1995,7 @@ function renderPanel(){
     const ctl = kind === "select" ? `<select data-ef="${f}"${cd}${al}>${ctaOptions(v, card != null)}</select>`
       : kind === "area" || kind === "note" ? `<textarea data-ef="${f}"${cd}${al} rows="${kind === "area" ? 6 : 2}">${esc(v)}</textarea>`
       : `<input data-ef="${f}"${cd}${al} value="${esc(v)}">`;
-    const emo = EMOJI_FIELDS.includes(f) ? `<button type="button" class="edemo" data-emoji title="Insert an emoji" aria-label="Insert an emoji in ${esc(label)}">😊</button>` : "";
+    const emo = f === "primary_text" && card == null ? `<button type="button" class="edemo" data-emoji title="Insert an emoji where the cursor is" aria-label="Insert an emoji where the cursor is">😊</button>` : "";
     return `<div class="edf"><span class="edrow"><span>${label}</span><span class="edtools">${emo}${kind === "select" ? "" : edCount(f, v)}</span></span>${ctl}</div>`;
   };
   const cards = ad.format === "carousel" ? (ad.cards || []).map((c, k) => `<fieldset><legend>Card ${k + 1}</legend>${field("headline", "Headline", "input", k)}${field("description", "Description", "input", k)}${field("cta", "Button", "select", k)}</fieldset>`).join("") : "";
@@ -2004,11 +2005,12 @@ function renderPanel(){
     ${cards}
     <p class="note" style="margin:0">The length counts show where Facebook Feed cuts the text. Images, brands and new ads are set up by Claude.</p>`;
 }
-/* Emoji picker: emoji-mart (MIT), bundled in vendor/ and loaded on first use. Its "Frequently used"
-   row, remembered by emoji-mart in this browser, sits at the top. A pick goes in at the cursor (or at
-   the end if the field wasn't active), through the same path as typing, and is one Undo step. */
-const EMOJI_FIELDS = ["label", "primary_text", "headline", "description", "notes"];
+/* Emoji picker: emoji-mart (MIT), bundled in vendor/ and loaded on first use. One button, by the
+   Primary text count; a pick goes in wherever the cursor is, or was last, in the panel's text fields
+   (the primary text if none yet), and that field is outlined while the picker is open. It goes through
+   the same path as typing and is one Undo step. Recently used emojis come first. */
 const EMO = {el: null, theme: null, wrap: null, target: null, loading: null};
+const EMO_LAST = {id: null, f: null, card: null, start: null, end: null};   // the text field the cursor was last in
 async function emojiLoad(){
   if (window.EmojiMart && window.EMOJI_MART_DATA) return;
   EMO.loading = EMO.loading || Promise.all([loadScript("vendor/emoji-mart.js"), loadScript("vendor/emoji-mart-data.js")]);
@@ -2017,6 +2019,7 @@ async function emojiLoad(){
 function emojiClose(){
   if (!EMO.wrap || EMO.wrap.hidden) return;
   EMO.wrap.hidden = true;
+  document.querySelectorAll("#edpanel .emtarget").forEach(x => x.classList.remove("emtarget"));
   const t = EMO.target;
   if (t && t.el && t.el.isConnected) { t.el.focus(); t.el.setSelectionRange(t.start, t.end); }
   EMO.target = null;
@@ -2034,6 +2037,7 @@ function emojiInsert(native){
   const old = el.value, start = Math.min(t.start, old.length), end = Math.min(t.end, old.length);
   el.value = old.slice(0, start) + native + old.slice(end);
   t.start = t.end = start + native.length;
+  Object.assign(EMO_LAST, {id: t.id, f: t.f, card: t.card, start: t.start, end: t.end});
   EDIT.undo.push({id: t.id, f: t.f, card: t.card, v: old, after: el.value});
   el.dispatchEvent(new Event("input", {bubbles: true}));   // mockups, count and saving, as for typing
   const u = $("#edpanel [data-edundo]"); if (u) u.disabled = false;
@@ -2050,12 +2054,17 @@ function emojiRecent(id){
   } catch (e) { /* storage blocked: the row keeps emoji-mart's order */ }
 }
 async function emojiOpen(btn){
-  const box = btn.closest(".edf"), el = box && box.querySelector("[data-ef]");
-  if (!el) return;
-  if (EMO.wrap && !EMO.wrap.hidden && EMO.target && EMO.target.el === el) return emojiClose();   // the button toggles
-  const active = document.activeElement === el;
-  EMO.target = {el, id: EDIT.id, f: el.dataset.ef, card: el.dataset.card != null ? +el.dataset.card : null,
-    start: active ? el.selectionStart : el.value.length, end: active ? el.selectionEnd : el.value.length};
+  if (EMO.wrap && !EMO.wrap.hidden) return emojiClose();   // the button toggles
+  const panel = $("#edpanel"), isText = x => x && panel.contains(x) && x.matches("input[data-ef], textarea[data-ef]");
+  const sel = (f, card) => panel.querySelector(`[data-ef="${f}"]${card != null ? `[data-card="${card}"]` : ":not([data-card])"}`);
+  let el = document.activeElement, start, end;
+  if (isText(el)) { start = el.selectionStart; end = el.selectionEnd; }              // the field being typed in
+  else if (EMO_LAST.id === EDIT.id && isText(el = sel(EMO_LAST.f, EMO_LAST.card))) {  // the one last typed in
+    start = Math.min(EMO_LAST.start ?? el.value.length, el.value.length); end = Math.min(EMO_LAST.end ?? start, el.value.length);
+  } else { el = sel("primary_text"); if (!el) return; start = end = el.value.length; }   // none yet: the primary text
+  EMO.target = {el, id: EDIT.id, f: el.dataset.ef, card: el.dataset.card != null ? +el.dataset.card : null, start, end};
+  panel.querySelectorAll(".emtarget").forEach(x => x.classList.remove("emtarget"));
+  el.classList.add("emtarget");
   try { await emojiLoad(); }
   catch (e) { edStatus("The emoji picker isn’t in this viewer yet. Ask Claude to re-render the library.", "warn"); EMO.target = null; return; }
   const theme = state.dark ? "dark" : "light";
@@ -2143,9 +2152,12 @@ async function edSave(){
   }
 }
 function bindPanel(el){
-  el.addEventListener("focusin", e => { const t = e.target.closest("[data-ef]"); if (t) EDIT.before = {id: EDIT.id, f: t.dataset.ef, card: t.dataset.card != null ? +t.dataset.card : null, v: t.value}; });
+  const remember = t => { if (t && t.matches("input[data-ef], textarea[data-ef]")) Object.assign(EMO_LAST, {id: EDIT.id, f: t.dataset.ef, card: t.dataset.card != null ? +t.dataset.card : null, start: t.selectionStart, end: t.selectionEnd}); };
+  ["keyup", "mouseup", "select"].forEach(ev => el.addEventListener(ev, e => remember(e.target.closest && e.target.closest("[data-ef]"))));
+  el.addEventListener("focusin", e => { const t = e.target.closest("[data-ef]"); remember(t); if (t) EDIT.before = {id: EDIT.id, f: t.dataset.ef, card: t.dataset.card != null ? +t.dataset.card : null, v: t.value}; });
   el.addEventListener("focusout", e => {
     const t = e.target.closest("[data-ef]"), b = EDIT.before;
+    remember(t);
     if (t && b && b.v !== t.value) EDIT.undo.push({...b, after: t.value});
     EDIT.before = null;
     const u = el.querySelector("[data-edundo]"); if (u) u.disabled = !EDIT.undo.length;

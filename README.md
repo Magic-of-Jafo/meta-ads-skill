@@ -57,7 +57,7 @@ After you reload the page, **Copy** → **Load the latest copy** reconnects with
 1. Click **✎ Edit copy** at the top and allow saving to the folder (once per session; if the viewer isn't connected yet, it asks for the folder as above).
 2. Click any text in a mockup: the primary text, headline, description or button. A panel opens on the right with that ad and that field ready.
 3. Type. That ad's mockups update as you pause, and the sheet is saved a second later: the panel says **Saved to ads.xlsx at …**. Use **‹ ›** to step through ads, **Undo** to take back the last change, and **Done** to finish.
-4. For an emoji, click **😊** beside a field's character count. Pick from the categories or search ("wine" finds 🍷); your most recently used ones are at the top. Each pick goes in where your cursor is, and the picker stays open for more; Escape closes it.
+4. For an emoji, click **😊** beside the Primary text count. It goes in wherever your cursor is, or was last, in any field (the primary text if you haven't clicked into one), and that field is outlined while the picker is open. Pick from the categories or search ("wine" finds 🍷); your most recently used ones are at the top. The picker stays open for more; Escape closes it.
 
 In Feed preview and All placements the panel edits the ad on show, so the Ad picker and arrows choose it; in Compare ads, click the ad's mockup.
 
