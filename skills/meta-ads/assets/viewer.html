@@ -87,6 +87,24 @@ table.mx th.ad .pickbox{margin-right:6px;vertical-align:-3px}
 .adid{font-weight:400;color:var(--ui-sub);font-size:11px}
 @media (max-width:700px){#bar{position:static}.seg button small{display:none}.rhs{margin-left:0}}
 #main{padding:20px 16px 60px}
+#edpanel{position:fixed;right:0;top:var(--barh,90px);bottom:0;width:min(390px,100vw);background:var(--ui-panel);color:var(--ui-text);border-left:1px solid var(--ui-line);box-shadow:-8px 0 24px rgba(0,0,0,.10);overflow-y:auto;z-index:45;padding:12px 16px 28px;display:flex;flex-direction:column;gap:12px;font-size:13px}
+body.editing #main{margin-right:min(400px,100vw)}
+#edpanel .edh,#edpanel .ednav,#edpanel .edrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#edpanel .edh .rhs{display:flex;gap:6px}
+#edpanel .ednav span{flex:1;text-align:center;overflow-wrap:anywhere}
+#edpanel label{display:flex;flex-direction:column;gap:4px;font-weight:600}
+#edpanel input,#edpanel textarea,#edpanel select{font:inherit;font-weight:400;font-size:13px;line-height:1.4;padding:6px 8px;border:1px solid var(--ui-line);border-radius:6px;background:var(--ui-bg);color:var(--ui-text);width:100%}
+#edpanel textarea{resize:vertical}
+#edpanel input:focus,#edpanel textarea:focus,#edpanel select:focus{outline:2px solid var(--ui-accent);outline-offset:0;border-color:transparent}
+#edpanel .edc{font-weight:400;font-size:11px;color:var(--ui-sub)}
+#edpanel .edc.over{color:var(--bad);font-weight:700}
+#edpanel .edst{margin:0;font-size:12px;color:var(--ui-sub);overflow-wrap:anywhere}
+#edpanel .edst.warn{color:var(--warn)} #edpanel .edst.err{color:var(--bad)}
+#edpanel fieldset{border:1px solid var(--ui-line);border-radius:8px;padding:6px 10px 10px;display:flex;flex-direction:column;gap:8px;margin:0}
+#edpanel legend{font-weight:700;padding:0 4px}
+body.editing #main .mk{cursor:text}
+body.editing #main .mk [data-clamp]:hover,body.editing #main .mk :is(.hl,.ds,.fbcta,.cta,.rhl,.rcta,.igcta,.nm):hover{outline:2px dashed var(--ui-accent);outline-offset:2px}
+.tile.edsel > .zoomable{outline:3px solid var(--ui-accent);outline-offset:3px;border-radius:4px}
 .summary{font-size:12px;color:var(--ui-sub);margin:0 0 14px}
 .tiles{display:flex;flex-wrap:wrap;gap:28px 24px;align-items:flex-start}
 .tile{display:flex;flex-direction:column;gap:6px}
@@ -902,7 +920,7 @@ function toolbar(){
     <p><span class="dot simulated"></span><b>Simulated</b>: something was approximated, usually an image in the wrong shape (cropped, padded or blurred to fit) or placeholder creative. Hover a status to see why.</p>
     <p><span class="dot not_eligible"></span><b>Not eligible</b>: Meta doesn’t run this kind of ad in that placement.</p>
     <p style="color:var(--ui-sub)">Keys: ← → step through ads (or placements in Compare ads).</p>`;
-  $("#bar").innerHTML = `<div class="row">${libCtl()}${SHEET_ON ? menu("sheet", `${sheetSummary()} ${chev}`, sheetBody()) : ""}
+  $("#bar").innerHTML = `<div class="row">${libCtl()}${SHEET_ON ? menu("sheet", `${sheetSummary()} ${chev}`, sheetBody()) : ""}${SHEET_ON && SHEET_API ? `<button class="ib${EDIT.on ? " on" : ""}" data-edit aria-pressed="${EDIT.on}" title="Click text in a mockup to edit it; saves to ${esc(D.sheet.file)}">${EDIT.on ? "✓ Editing copy" : "✎ Edit copy"}</button>` : ""}
     <span class="seg" role="tablist">${MODES.map(([v, l, d]) => `<button data-mode="${v}" class="${state.mode===v?"on":""}" role="tab" aria-selected="${state.mode===v}">${l}<small>${d}</small></button>`).join("")}</span>
     <span class="rhs">${D.share ? "" : `<button class="ib${SELECTING ? " on" : ""}" data-selmode aria-pressed="${SELECTING}" title="Tick the ads you want in a PDF, PowerPoint or file">${SELECTING ? "✓ Selecting ads" : "☐ Select ads"}</button>`}${D.share ? "" : menu("export", `Export${EXP.picked.size && EXP.scope === "pick" ? ` <span class="nbadge">${EXP.picked.size}</span>` : ""} ${chev}`, expBody, true)}${menu("key", `<span><span class="dot actual"></span>Actual</span><span><span class="dot simulated"></span>Simulated</span><span>What’s this?</span>`, keyBody, true)}
     <button class="ib${state.dark ? " on" : ""}" data-dark aria-pressed="${state.dark}" title="Dark theme for the mockups and this viewer">${state.dark ? "☀ Light mode" : "☾ Dark mode"}</button></span></div>
@@ -919,6 +937,7 @@ function toolbar(){
   bindExport(bar, adsF);
   bindSelect(bar, adsF);
   if (SHEET_ON) bindSheet(bar);
+  const eb = bar.querySelector("[data-edit]"); if (eb) eb.onclick = () => EDIT.on ? edStop() : edStart();
   bar.querySelector("[data-dark]").onclick = () => { state.dark = !state.dark; go(); };
   bar.querySelectorAll("[data-step]").forEach(b => b.onclick = () => stepAd(+b.dataset.step));
   bar.querySelectorAll("[data-plstep]").forEach(b => b.onclick = () => stepPl(+b.dataset.plstep));
@@ -1405,23 +1424,29 @@ async function mockPng(node, css, E){
 /* A zip with no compression (the pictures are compressed already), which is all a .pptx needs. */
 const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
 const crc32 = b => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC_T[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
-function zipStore(files, type){
+function zipRaw(entries, type){
+  /* entries: {name, method (0 stored, 8 deflated), crc, usize, raw (the bytes as stored)}. Entries copied
+     from another zip keep their compressed bytes as they are. */
   const enc = new TextEncoder(), parts = [], cd = [], d = new Date();
   const time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
   let off = 0;
-  for (const [name, data] of files) {
-    const b = typeof data === "string" ? enc.encode(data) : data, nm = enc.encode(name), crc = crc32(b);
+  for (const en of entries) {
+    const nm = enc.encode(en.name), b = en.raw;
     const h = new DataView(new ArrayBuffer(30)), c = new DataView(new ArrayBuffer(46));
-    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(10, time, true); h.setUint16(12, date, true);
-    h.setUint32(14, crc, true); h.setUint32(18, b.length, true); h.setUint32(22, b.length, true); h.setUint16(26, nm.length, true);
-    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(12, time, true); c.setUint16(14, date, true);
-    c.setUint32(16, crc, true); c.setUint32(20, b.length, true); c.setUint32(24, b.length, true); c.setUint16(28, nm.length, true); c.setUint32(42, off, true);
+    h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, en.method, true); h.setUint16(10, time, true); h.setUint16(12, date, true);
+    h.setUint32(14, en.crc, true); h.setUint32(18, b.length, true); h.setUint32(22, en.usize, true); h.setUint16(26, nm.length, true);
+    c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(10, en.method, true); c.setUint16(12, time, true); c.setUint16(14, date, true);
+    c.setUint32(16, en.crc, true); c.setUint32(20, b.length, true); c.setUint32(24, en.usize, true); c.setUint16(28, nm.length, true); c.setUint32(42, off, true);
     parts.push(h.buffer, nm, b); cd.push(c.buffer, nm);
     off += 30 + nm.length + b.length;
   }
   const e = new DataView(new ArrayBuffer(22)), cdSize = cd.reduce((n, p) => n + p.byteLength, 0);
-  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, cdSize, true); e.setUint32(16, off, true);
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, entries.length, true); e.setUint16(10, entries.length, true); e.setUint32(12, cdSize, true); e.setUint32(16, off, true);
   return new Blob([...parts, ...cd, e.buffer], {type});
+}
+function zipStore(files, type){   // [[name, string | bytes]], no compression (pictures are compressed already)
+  const enc = new TextEncoder();
+  return zipRaw(files.map(([name, data]) => { const b = typeof data === "string" ? enc.encode(data) : data; return {name, method: 0, crc: crc32(b), usize: b.length, raw: b}; }), type);
 }
 const xesc = s => String(s ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
 function dkNotes(s){   // deck.py's notes_for
@@ -1624,62 +1649,65 @@ const idb = (fn) => new Promise((ok, bad) => {
   r.onsuccess = () => { const tx = r.result.transaction("handles", "readwrite"), st = tx.objectStore("handles"), q = fn(st); tx.oncomplete = () => { r.result.close(); ok(q && q.result); }; tx.onerror = () => bad(tx.error); };
 });
 const idbGet = k => idb(st => st.get(k)), idbSet = (k, v) => idb(st => st.put(v, k)), idbDel = k => idb(st => st.delete(k));
-/* .xlsx is a zip of XML. Read the central directory, inflate with the browser's own decompressor. */
-async function unzipXlsx(buf){
+/* .xlsx is a zip of XML. Read the central directory; inflate with the browser's own decompressor. */
+const xmlDoc = t => new DOMParser().parseFromString(t, "application/xml");
+const byTag = (el, tag) => [...el.getElementsByTagNameNS("*", tag)];
+const xText = s => String(s).replace(/_x([0-9A-Fa-f]{4})_/g, (m, h) => String.fromCharCode(parseInt(h, 16))).replace(/\r\n?/g, "\n");
+const colIndex = ref => { let n = 0; for (const ch of ref.replace(/\d+$/, "")) n = n * 26 + ch.toUpperCase().charCodeAt(0) - 64; return n - 1; };
+const colName = i => { let s = ""; for (i++; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + (i - 1) % 26) + s; return s; };
+async function xlsxOpen(buf){
   const dv = new DataView(buf), u8 = new Uint8Array(buf), dec = new TextDecoder();
   let e = buf.byteLength - 22;
   while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
   if (e < 0) throw new Error("not an .xlsx file");
   const n = dv.getUint16(e + 10, true);
   let p = dv.getUint32(e + 16, true);
-  const files = {};
+  const entries = [];
   for (let i = 0; i < n; i++) {
-    const method = dv.getUint16(p + 10, true), size = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true);
-    const xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    const method = dv.getUint16(p + 10, true), crc = dv.getUint32(p + 16, true), csize = dv.getUint32(p + 20, true), usize = dv.getUint32(p + 24, true);
+    const nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
     const name = dec.decode(u8.subarray(p + 46, p + 46 + nl));
-    files[name] = {method, size, off};
+    const start = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
+    entries.push({name, method, crc, usize, raw: u8.subarray(start, start + csize)});
     p += 46 + nl + xl + cl;
   }
-  return async name => {
-    const f = files[name];
+  const byName = Object.fromEntries(entries.map(x => [x.name, x]));
+  const text = async name => {
+    const f = byName[name];
     if (!f) return null;
-    const start = f.off + 30 + dv.getUint16(f.off + 26, true) + dv.getUint16(f.off + 28, true);
-    const raw = u8.subarray(start, start + f.size);
-    if (f.method === 0) return dec.decode(raw);
+    if (f.method === 0) return dec.decode(f.raw);
     if (f.method !== 8) throw new Error("unsupported compression in " + name);
-    return await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+    return await new Response(new Blob([f.raw]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
   };
+  const wb = xmlDoc(await text("xl/workbook.xml") || "<x/>");
+  const rels = xmlDoc(await text("xl/_rels/workbook.xml.rels") || "<x/>");
+  const target = Object.fromEntries(byTag(rels, "Relationship").map(r => [r.getAttribute("Id"), r.getAttribute("Target")]));
+  const sheets = {};
+  for (const sh of byTag(wb, "sheet")) {
+    const rid = sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id") || sh.getAttribute("r:id");
+    if (target[rid]) sheets[sh.getAttribute("name")] = target[rid].startsWith("/") ? target[rid].slice(1) : "xl/" + target[rid].replace(/^\.\//, "");
+  }
+  const ssXml = await text("xl/sharedStrings.xml");
+  const shared = ssXml ? byTag(xmlDoc(ssXml), "si").map(si => byTag(si, "t").filter(t => !t.closest || !t.closest("rPh")).map(t => t.textContent).join("")) : [];
+  return {entries, text, sheets, shared};
 }
-const xmlDoc = t => new DOMParser().parseFromString(t, "application/xml");
-const byTag = (el, tag) => [...el.getElementsByTagNameNS("*", tag)];
-const xText = s => String(s).replace(/_x([0-9A-Fa-f]{4})_/g, (m, h) => String.fromCharCode(parseInt(h, 16))).replace(/\r\n?/g, "\n");
-const colIndex = ref => { let n = 0; for (const ch of ref.replace(/\d+$/, "")) n = n * 26 + ch.toUpperCase().charCodeAt(0) - 64; return n - 1; };
+function cellText(c, shared){
+  const t = c.getAttribute("t"), v = byTag(c, "v")[0];
+  const val = t === "s" ? (v ? shared[+v.textContent] : null) : t === "inlineStr" ? byTag(c, "t").map(x => x.textContent).join("") : v ? v.textContent : null;
+  return val == null || val === "" ? null : xText(val);
+}
 /* Tabs by name -> rows of cell text (row 0 is the header). Formulas give their saved result. */
 async function readXlsx(buf){
-  const get = await unzipXlsx(buf);
-  const wb = xmlDoc(await get("xl/workbook.xml") || "<x/>");
-  const rels = xmlDoc(await get("xl/_rels/workbook.xml.rels") || "<x/>");
-  const target = Object.fromEntries(byTag(rels, "Relationship").map(r => [r.getAttribute("Id"), r.getAttribute("Target")]));
-  const ssXml = await get("xl/sharedStrings.xml");
-  const shared = ssXml ? byTag(xmlDoc(ssXml), "si").map(si => byTag(si, "t").filter(t => !t.closest || !t.closest("rPh")).map(t => t.textContent).join("")) : [];
-  const tabs = {};
-  for (const sh of byTag(wb, "sheet")) {
-    const name = sh.getAttribute("name"), rid = sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id") || sh.getAttribute("r:id");
-    if (!["Ads", "Cards"].includes(name) || !target[rid]) continue;
-    const path = target[rid].startsWith("/") ? target[rid].slice(1) : "xl/" + target[rid].replace(/^\.\//, "");
-    const doc = xmlDoc(await get(path) || "<x/>");
-    const rows = [];
+  const x = await xlsxOpen(buf), tabs = {};
+  for (const name of ["Ads", "Cards"]) {
+    if (!x.sheets[name]) continue;
+    const doc = xmlDoc(await x.text(x.sheets[name]) || "<x/>"), rows = [];
     for (const row of byTag(doc, "row")) {
       const r = (+row.getAttribute("r") || rows.length + 1) - 1, cells = [];
       let k = 0;
       for (const c of byTag(row, "c")) {
-        const ref = c.getAttribute("r"), j = ref ? colIndex(ref) : k, t = c.getAttribute("t");
-        const v = byTag(c, "v")[0];
-        let val = null;
-        if (t === "s") val = v ? shared[+v.textContent] : null;
-        else if (t === "inlineStr") val = byTag(c, "t").map(x => x.textContent).join("");
-        else if (v) val = v.textContent;
-        if (val != null && val !== "") cells[j] = xText(val);
+        const ref = c.getAttribute("r"), j = ref ? colIndex(ref) : k, v = cellText(c, x.shared);
+        if (v != null) cells[j] = v;
         k = j + 1;
       }
       rows[r] = cells;
@@ -1687,6 +1715,83 @@ async function readXlsx(buf){
     tabs[name] = rows;
   }
   return tabs;
+}
+/* Change cells of the sheet and write it back. Only the edited cells change: their text becomes an
+   inline string (Excel turns it back into its usual form on its next save); styles, other cells,
+   dropdowns and the user's own columns are left exactly as they are. patches: [{tab, id, card, head, value}]. */
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+function setCell(doc, row, col, value){
+  const ns = doc.documentElement.namespaceURI, cells = byTag(row, "c");
+  let c = cells.find(x => colIndex(x.getAttribute("r")) === col);
+  if (!c) {
+    c = doc.createElementNS(ns, "c");
+    c.setAttribute("r", colName(col) + row.getAttribute("r"));
+    row.insertBefore(c, cells.find(x => colIndex(x.getAttribute("r")) > col) || null);
+  }
+  while (c.firstChild) c.removeChild(c.firstChild);
+  c.removeAttribute("t");
+  if (value != null && value !== "") {
+    c.setAttribute("t", "inlineStr");
+    const is = doc.createElementNS(ns, "is"), t = doc.createElementNS(ns, "t");
+    t.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:space", "preserve");
+    t.textContent = String(value).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
+    is.appendChild(t); c.appendChild(is);
+  }
+}
+async function sheetWrite(patches){
+  const fh = await SHEET.dir.getFileHandle(D.sheet.file);
+  const buf = await (await fh.getFile()).arrayBuffer();   // the file as it is now: edits made in Excel since are kept
+  const x = await xlsxOpen(buf), changed = {}, missing = [];
+  const decl = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n';
+  for (const tab of ["Ads", "Cards"]) {
+    const ps = patches.filter(p => p.tab === tab);
+    if (!ps.length) continue;
+    if (!x.sheets[tab]) { missing.push(...ps); continue; }
+    const doc = xmlDoc(await x.text(x.sheets[tab]));
+    const rows = byTag(doc, "row"), head = rows.find(r => r.getAttribute("r") === "1") || rows[0];
+    const cols = {};
+    for (const c of byTag(head || doc, "c")) { const v = cellText(c, x.shared); if (v) cols[v.trim().toLowerCase()] = colIndex(c.getAttribute("r")); }
+    const idCol = cols[tab === "Ads" ? "id" : "ad id"], cardCol = cols.card;
+    const at = (r, j) => { const c = byTag(r, "c").find(x => colIndex(x.getAttribute("r")) === j); return c ? (cellText(c, x.shared) || "").trim() : ""; };
+    for (const p of ps) {
+      const col = cols[p.head.toLowerCase()];
+      const row = idCol == null ? null : rows.find(r => r !== head && at(r, idCol) === p.id && (tab === "Ads" || at(r, cardCol) === String(p.card)));
+      if (col == null || !row) { missing.push(p); continue; }
+      setCell(doc, row, col, p.value);
+    }
+    changed[x.sheets[tab]] = decl + new XMLSerializer().serializeToString(doc);
+  }
+  if (!Object.keys(changed).length) return {missing, wrote: false};
+  // have Excel recalculate on opening, so the length columns match the new text
+  const wb = xmlDoc(await x.text("xl/workbook.xml"));
+  let calc = byTag(wb, "calcPr")[0];
+  if (!calc) {
+    calc = wb.createElementNS(wb.documentElement.namespaceURI, "calcPr");
+    const after = byTag(wb, "definedNames")[0] || byTag(wb, "sheets")[0];
+    after.parentNode.insertBefore(calc, after.nextSibling);
+  }
+  calc.setAttribute("fullCalcOnLoad", "1");
+  changed["xl/workbook.xml"] = decl + new XMLSerializer().serializeToString(wb);
+  if (!SHEET.backedUp) {   // a copy of the sheet as it was, before the first save of this session
+    const bd = await SHEET.dir.getDirectoryHandle("backups", {create: true});
+    const n = new Date(), pad = v => String(v).padStart(2, "0");
+    const bh = await bd.getFileHandle(`ads-${n.getFullYear()}-${pad(n.getMonth() + 1)}-${pad(n.getDate())}-${pad(n.getHours())}${pad(n.getMinutes())}${pad(n.getSeconds())}.xlsx`, {create: true});
+    const bw = await bh.createWritable(); await bw.write(buf); await bw.close();
+    SHEET.backedUp = true;
+  }
+  const out = [];
+  for (const en of x.entries) {
+    if (changed[en.name] == null) { out.push(en); continue; }
+    const data = new TextEncoder().encode(changed[en.name]);
+    const raw = new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer());
+    out.push({name: en.name, method: 8, crc: crc32(data), usize: data.length, raw});
+  }
+  const w = await fh.createWritable();
+  await w.write(zipRaw(out, XLSX_MIME));
+  await w.close();
+  const f2 = await fh.getFile();
+  SHEET.lastMod = f2.lastModified; SHEET.saved = new Date(f2.lastModified);
+  return {missing, wrote: true};
 }
 const domainOf = url => { if (!url) return null; try { const h = new URL(url.includes("//") ? url : "https://" + url).hostname; return h.startsWith("www.") ? h.slice(4) : h || null; } catch (e) { return null; } };
 function copyChecks(ad, p){   // metaads.copy_checks
@@ -1742,6 +1847,7 @@ function applySheet(tabs){
   return {changed, unknown};
 }
 async function sheetLoad(force){
+  if (!force && (EDIT.pending.size || EDIT.saving)) return;   // our own unsaved edits win; the save re-reads the file
   try {
     const fh = await SHEET.dir.getFileHandle(D.sheet.file);
     const f = await fh.getFile();
@@ -1749,6 +1855,7 @@ async function sheetLoad(force){
     const r = applySheet(await readXlsx(await f.arrayBuffer()));
     Object.assign(SHEET, {status: "live", lastMod: f.lastModified, saved: new Date(f.lastModified), changed: r.changed, unknown: r.unknown, msg: "", fails: 0});
     go();
+    if (EDIT.on && !$("#edpanel").contains(document.activeElement)) renderPanel();   // an edit saved in Excel shows here too
   } catch (e) {
     if (e && e.name === "NotAllowedError") { SHEET.status = "click"; stopSheetPoll(); toolbar(); return; }
     if (e && e.name === "NotFoundError") { SHEET.status = "error"; SHEET.msg = `There's no ${D.sheet.file} in that folder any more.`; stopSheetPoll(); toolbar(); return; }
@@ -1758,14 +1865,14 @@ async function sheetLoad(force){
 function startSheetPoll(){ stopSheetPoll(); SHEET.timer = setInterval(() => { if (!document.hidden && SHEET.status === "live") sheetLoad(false); }, 2000); }
 function stopSheetPoll(){ if (SHEET.timer) clearInterval(SHEET.timer); SHEET.timer = null; }
 const libPath = () => { const p = libFolder().replace(/\/viewer$/, ""); return /^[A-Za-z]:\//.test(p) ? p.replace(/\//g, "\\") : p; };
-async function sheetConnect(){
+async function sheetConnect(mode = "read"){
   // A page can't open a folder by its path, so the user picks it. Make that quick: the path goes on the
   // clipboard to paste into the dialog's address bar, and the dialog remembers this library's folder
   // (one picker id per library) so next time it opens right there.
   navigator.clipboard.writeText(libPath()).catch(() => {});
   let h = 0; for (const ch of LIB_ID) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   let dir;
-  try { dir = await showDirectoryPicker({id: "metaads-" + h.toString(36), mode: "read"}); }
+  try { dir = await showDirectoryPicker({id: "metaads-" + h.toString(36), mode}); }
   catch (e) { if (e && e.name === "AbortError") return; SHEET.status = "error"; SHEET.msg = "The browser didn’t allow it: " + (e && e.message || e); toolbar(); return; }
   if (dir.name !== LIB_ID) {
     SHEET.status = "error";
@@ -1828,9 +1935,196 @@ function sheetBody(){
     <div class="fld" style="justify-content:flex-start"><button class="ib" data-sheetcopy>Copy path</button></div>
     <p class="eh">In the mockups</p>${state_}`;
 }
+/* ------------------------------------------------------------------ Editing the copy
+   Edit copy turns on edit mode: a click on text in a mockup opens that ad in the side panel with that
+   field ready; every mockup of the ad updates as you type, and about a second later the changed cells
+   are written to ads.xlsx (sheetWrite). Needs the library folder with write permission (the browser
+   asks once). Edits wait while Excel holds the file, and Undo takes back the last change. */
+const EDIT = {on: false, id: null, pending: new Map(), saving: false, again: false, saveTimer: null, viewTimer: null, retry: null, undo: [], before: null, msg: "", tone: ""};
+const ED_FIELDS = [["label", "Ad name", "input"], ["primary_text", "Primary text", "area"], ["headline", "Headline", "input"], ["description", "Description", "input"],
+  ["cta", "Button", "select"], ["display_link", "Display link", "input"], ["destination_url", "Destination URL", "input"], ["notes", "Notes", "note"]];
+const ED_HEAD = {label: "Ad name", primary_text: "Primary text", headline: "Headline", description: "Description", cta: "Button", display_link: "Display link", destination_url: "Destination URL", notes: "Notes"};
+const edLimits = () => { const t = (P.fb_feed_mobile || D.placements[0]).text || {}; return {primary_text: (t.primary_text || {}).chars, headline: (t.headline || {}).chars, description: (t.description || {}).chars}; };
+const edCount = (f, v) => { const n = [...(v || "")].length, L = edLimits()[f]; return L || f in edLimits() ? `<span class="edc${L && n > L ? " over" : ""}" data-cnt="${f}">${n}${L ? ` / ${L}` : ""}</span>` : ""; };
+const ctaOptions = (cur, inherit) => `${inherit ? `<option value="" ${cur === "" ? "selected" : ""}>Same as the ad</option>` : ""}<option value="NO_BUTTON" ${cur === "NO_BUTTON" ? "selected" : ""}>No button</option>${Object.entries(D.cta || {}).filter(([c]) => c !== "NO_BUTTON").map(([c, l]) => `<option value="${esc(c)}" ${c === cur ? "selected" : ""}>${esc(l)}</option>`).join("")}`;
+function edValue(ad, f, card){   // what the panel shows for a field
+  if (card != null) {
+    const c = ad.cards[card];
+    if (f !== "cta") return c[f] || "";
+    const base = (BASE_COPY[ad.id].cards[card] || {}).cta, inherits = base === BASE_COPY[ad.id].cta && c.cta === ad.cta;
+    return inherits ? "" : c.cta == null ? "NO_BUTTON" : c.cta;
+  }
+  if (f === "cta") return ad.cta == null ? "NO_BUTTON" : ad.cta;
+  return ad[f] || "";
+}
+function renderPanel(){
+  let el = $("#edpanel");
+  if (!EDIT.on) { if (el) el.remove(); document.body.classList.remove("editing"); return; }
+  if (!el) { el = document.createElement("aside"); el.id = "edpanel"; el.setAttribute("aria-label", "Edit the ad copy"); document.body.appendChild(el); bindPanel(el); }
+  document.body.classList.add("editing");
+  const ad = AD[EDIT.id];
+  const status = `<p class="edst ${EDIT.tone}" aria-live="polite">${EDIT.msg || (SHEET.saved ? `Saves to ${esc(D.sheet.file)} as you type. Last saved ${esc(fmtTime(SHEET.saved))}.` : `Saves to ${esc(D.sheet.file)} as you type.`)}</p>`;
+  const head = `<div class="edh"><b>Edit copy</b><span class="rhs"><button class="ib" data-edundo ${EDIT.undo.length ? "" : "disabled"} title="Take back the last change">Undo</button><button class="ib" data-edclose title="Stop editing">Done</button></span></div>`;
+  if (!ad) { el.innerHTML = `${head}${status}<p class="note" style="margin:0">Click any text in a mockup (the primary text, headline, description or button) to edit that ad here.</p>`; return; }
+  const list = filteredAds(), i = list.findIndex(a => a.id === ad.id);
+  const field = (f, label, kind, card) => {
+    const v = edValue(ad, f, card), cd = card != null ? ` data-card="${card}"` : "";
+    const ctl = kind === "select" ? `<select data-ef="${f}"${cd}>${ctaOptions(v, card != null)}</select>`
+      : kind === "area" || kind === "note" ? `<textarea data-ef="${f}"${cd} rows="${kind === "area" ? 6 : 2}">${esc(v)}</textarea>`
+      : `<input data-ef="${f}"${cd} value="${esc(v)}">`;
+    return `<label><span class="edrow"><span>${label}</span>${kind === "select" ? "" : edCount(f, v)}</span>${ctl}</label>`;
+  };
+  const cards = ad.format === "carousel" ? (ad.cards || []).map((c, k) => `<fieldset><legend>Card ${k + 1}</legend>${field("headline", "Headline", "input", k)}${field("description", "Description", "input", k)}${field("cta", "Button", "select", k)}</fieldset>`).join("") : "";
+  el.innerHTML = `${head}${status}
+    <div class="ednav"><button class="ib" data-ednav="-1" ${i <= 0 ? "disabled" : ""} aria-label="Previous ad">‹</button><span><b>${esc(clip(fullName(ad), 46))}</b> <span class="cnt">${esc(ad.id)}</span></span><button class="ib" data-ednav="1" ${i < 0 || i >= list.length - 1 ? "disabled" : ""} aria-label="Next ad">›</button></div>
+    ${ED_FIELDS.filter(([f]) => !(ad.format === "carousel" && (f === "headline" || f === "description"))).map(([f, l, k]) => field(f, l, k)).join("")}
+    ${cards}
+    <p class="note" style="margin:0">The length counts show where Facebook Feed cuts the text. Images, brands and new ads are set up by Claude.</p>`;
+}
+function edOpen(id, f, card){
+  EDIT.id = id;
+  if (state.mode !== "matrix" && (state.mode === "feed" || state.mode === "gallery")) state.ad = id;
+  renderPanel(); go();
+  const sel = `[data-ef="${f || "primary_text"}"]${card != null ? `[data-card="${card}"]` : ":not([data-card])"}`;
+  const inp = $("#edpanel").querySelector(sel) || $("#edpanel").querySelector("[data-ef]");
+  if (inp) { inp.focus(); if (inp.setSelectionRange && inp.tagName !== "SELECT") { const n = inp.value.length; inp.setSelectionRange(n, n); } inp.scrollIntoView({block: "nearest"}); }
+}
+function edApply(id, f, card, v){   // put a panel value into the ad, and queue its cell
+  const ad = AD[id];
+  let cell;
+  if (card != null) {
+    const c = ad.cards[card];
+    if (f === "cta") { c.cta = v === "" ? ad.cta : v === "NO_BUTTON" ? null : v; cell = v === "" ? "" : v === "NO_BUTTON" ? "No button" : D.cta[v]; }
+    else { c[f] = v; cell = v; }
+  } else if (f === "cta") {
+    const old = ad.cta;
+    ad.cta = v === "NO_BUTTON" || v === "" ? null : v;
+    (ad.cards || []).forEach(c => { if (c.cta === old) c.cta = ad.cta; });   // cards that follow the ad's button
+    cell = ad.cta ? D.cta[ad.cta] : "No button";
+  } else {
+    ad[f] = v; cell = v;
+    if (f === "display_link" || f === "destination_url") ad.display_link = (f === "display_link" ? v : ad.display_link) || domainOf(ad.destination_url) || "";
+  }
+  for (const [pl, c] of Object.entries(D.matrix[id] || {})) if (c && P[pl] && "copy" in c) c.copy = copyChecks(ad, P[pl]);
+  EDIT.pending.set(`${id}|${card ?? ""}|${f}`, {tab: card != null ? "Cards" : "Ads", id, card: card != null ? card + 1 : null, head: ED_HEAD[f], value: cell});
+  clearTimeout(EDIT.viewTimer); EDIT.viewTimer = setTimeout(go, 120);
+  clearTimeout(EDIT.saveTimer); EDIT.saveTimer = setTimeout(edSave, 900);
+  edStatus("Saving…", "");
+}
+function edStatus(msg, tone){ EDIT.msg = msg; EDIT.tone = tone; const p = $("#edpanel .edst"); if (p) { p.textContent = msg || ""; p.className = "edst " + (tone || ""); } }
+async function edSave(){
+  clearTimeout(EDIT.saveTimer); clearTimeout(EDIT.retry);
+  if (!EDIT.pending.size) return;
+  if (EDIT.saving) { EDIT.again = true; return; }
+  EDIT.saving = true;
+  const batch = new Map(EDIT.pending), patches = [...batch.values()];
+  try {
+    const r = await sheetWrite(patches);
+    for (const [k, p] of batch) if (EDIT.pending.get(k) === p) EDIT.pending.delete(k);
+    if (r.missing.length) edStatus(`Saved, except ${r.missing.length} field${r.missing.length === 1 ? "" : "s"} with no row or column in the sheet (${esc(r.missing.map(p => p.id).join(", "))}). Ask Claude to re-render to add them.`, "warn");
+    else edStatus(`Saved to ${D.sheet.file} at ${fmtTime(SHEET.saved)}.`, "");
+    toolbar();
+  } catch (e) {
+    const name = e && e.name, m = String(e && e.message || e);
+    if (name === "NotAllowedError" || name === "SecurityError") edStatus("The browser no longer allows saving. Click Edit copy again to allow it; your edits are kept here.", "err");
+    else if (name === "NoModificationAllowedError" || name === "InvalidStateError" || /lock|in use|being used|modif/i.test(m)) {
+      edStatus(`Waiting to save: ${D.sheet.file} is open in Excel. Close it there and your edits are saved here (don’t save it in Excel, or Excel’s copy replaces these edits).`, "warn");
+      EDIT.retry = setTimeout(edSave, 3000);
+    } else { edStatus("Couldn’t save: " + m + ". Your edits are kept here; it tries again in a few seconds.", "err"); EDIT.retry = setTimeout(edSave, 5000); }
+  } finally {
+    EDIT.saving = false;
+    if (EDIT.again) { EDIT.again = false; edSave(); }
+  }
+}
+function bindPanel(el){
+  el.addEventListener("focusin", e => { const t = e.target.closest("[data-ef]"); if (t) EDIT.before = {id: EDIT.id, f: t.dataset.ef, card: t.dataset.card != null ? +t.dataset.card : null, v: t.value}; });
+  el.addEventListener("focusout", e => {
+    const t = e.target.closest("[data-ef]"), b = EDIT.before;
+    if (t && b && b.v !== t.value) EDIT.undo.push({...b, after: t.value});
+    EDIT.before = null;
+    const u = el.querySelector("[data-edundo]"); if (u) u.disabled = !EDIT.undo.length;
+  });
+  el.addEventListener("input", e => {
+    const t = e.target.closest("[data-ef]");
+    if (!t) return;
+    edApply(EDIT.id, t.dataset.ef, t.dataset.card != null ? +t.dataset.card : null, t.value);
+    const c = t.closest("label") && t.closest("label").querySelector("[data-cnt]");
+    if (c) { const n = [...t.value].length, L = edLimits()[t.dataset.ef]; c.textContent = L ? `${n} / ${L}` : String(n); c.classList.toggle("over", !!(L && n > L)); }
+  });
+  el.addEventListener("change", e => { const t = e.target.closest("select[data-ef]"); if (t) t.blur(); });   // a choice is a whole change: ready for Undo
+  el.addEventListener("click", e => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.matches("[data-edclose]")) edStop();
+    else if (b.matches("[data-edundo]")) {
+      const u = EDIT.undo.pop();
+      if (!u) return;
+      edApply(u.id, u.f, u.card, u.v);
+      if (u.id === EDIT.id) renderPanel();
+      edSave();
+    } else if (b.matches("[data-ednav]")) {
+      const list = filteredAds(), i = list.findIndex(a => a.id === EDIT.id), n = list[i + +b.dataset.ednav];
+      if (n) edOpen(n.id);
+    }
+  });
+}
+async function edStart(){
+  if (!SHEET.dir) {
+    await sheetConnect("readwrite");
+    if (SHEET.status !== "live") return;
+  } else {
+    let p = "prompt";
+    try { p = await SHEET.dir.queryPermission({mode: "readwrite"}); } catch (e) {}
+    if (p !== "granted") { try { p = await SHEET.dir.requestPermission({mode: "readwrite"}); } catch (e) { p = "denied"; } }
+    if (p !== "granted") { SHEET.status = SHEET.status === "live" ? "live" : "click"; SHEET.msg = ""; alert("Editing needs the browser’s permission to save to the library folder."); return; }
+    if (SHEET.status !== "live") { await sheetLoad(true); if (SHEET.status !== "live") return; startSheetPoll(); }
+  }
+  EDIT.on = true; EDIT.msg = ""; EDIT.tone = "";
+  if (!EDIT.id && (state.mode === "feed" || state.mode === "gallery")) EDIT.id = state.ad;
+  renderPanel(); go();
+}
+async function edStop(){
+  if (EDIT.pending.size) await edSave();
+  EDIT.on = false;
+  renderPanel(); go();
+}
+/* In edit mode a click on a mockup picks the ad and, from what was clicked, the field. */
+function edField(target, ad){
+  if (target.closest("[data-clamp]")) return {f: "primary_text"};
+  const el = target.closest("div,span,a,button,p,b");
+  const t = el ? el.textContent.replace(/\s+/g, " ").trim() : "";
+  if (!t) return {};
+  const same = v => v && String(v).replace(/\s+/g, " ").trim() === t;
+  for (const [k, c] of (ad.cards || []).entries()) {
+    if (same(c.headline)) return {f: "headline", card: k};
+    if (same(c.description)) return {f: "description", card: k};
+  }
+  if (same(ad.headline)) return {f: "headline"};
+  if (same(ad.description)) return {f: "description"};
+  if (same(ctaLabel(ad.cta))) {
+    if (ad.format === "carousel") {   // the button of the card that was clicked, if it can be told
+      const box = target.closest(".cd, .igcar > div");
+      const k = box ? (ad.cards || []).findIndex(c => c.headline && box.textContent.includes(c.headline)) : -1;
+      if (k >= 0) return {f: "cta", card: k};
+    }
+    return {f: "cta"};
+  }
+  if (same(ad.display_link)) return {f: "display_link"};
+  return {};
+}
+$("#main").addEventListener("click", e => {
+  if (!EDIT.on || e.target.closest("[data-pick], .tile-h, button.ib, a.ib")) return;
+  const tile = e.target.closest("[data-tile]");
+  const id = tile ? tile.dataset.tile : (state.mode === "feed" || state.mode === "gallery") && e.target.closest(".mk") ? state.ad : null;
+  if (!id || !AD[id]) return;
+  e.preventDefault(); e.stopPropagation();
+  const r = edField(e.target, AD[id]);
+  edOpen(id, r.f, r.card);
+}, true);
+addEventListener("beforeunload", e => { if (EDIT.pending.size || EDIT.saving) { e.preventDefault(); e.returnValue = ""; } });
 function bindSheet(bar){
   const q = sel => bar.querySelector(sel);
-  if (q("[data-sheetconnect]")) q("[data-sheetconnect]").onclick = () => sheetConnect();
+  if (q("[data-sheetconnect]")) q("[data-sheetconnect]").onclick = () => sheetConnect("read");
   if (q("[data-sheetresume]")) q("[data-sheetresume]").onclick = () => sheetResume();
   if (q("[data-sheetoff]")) q("[data-sheetoff]").onclick = () => sheetDisconnect();
   const cp = q("[data-sheetcopy]");
@@ -1887,7 +2181,7 @@ const pickBox = (id, label = "") => SELECTING && !state.export && !D.share ? `<l
 const pickedCls = id => SELECTING && EXP.picked.has(id) ? " picked" : "";
 function tileHtml(title, c, inner, width, adId){
   const reasons = [...(c.reasons||[]).map(r => `<li>${esc(r)}</li>`), ...(c.copy||[]).map(r => `<li class="copy">${esc(r)}</li>`)].join("");
-  return `<div class="tile${adId ? pickedCls(adId) : ""}" style="--tw:${width}px"${adId ? ` data-tile="${esc(adId)}"` : ""}><div class="tile-h">${adId ? pickBox(adId) : ""}<b>${title}</b><span class="pill ${c.status}" title="${esc(statusTitle(c))}">${c.status.replace("_"," ")}</span></div>${reasons && state.badges ? `<ul class="reasons">${reasons}</ul>` : ""}<div class="zoomable" style="zoom:${state.zoom}">${inner}</div></div>`;
+  return `<div class="tile${adId ? pickedCls(adId) : ""}${adId && EDIT.on && EDIT.id === adId ? " edsel" : ""}" style="--tw:${width}px"${adId ? ` data-tile="${esc(adId)}"` : ""}><div class="tile-h">${adId ? pickBox(adId) : ""}<b>${title}</b><span class="pill ${c.status}" title="${esc(statusTitle(c))}">${c.status.replace("_"," ")}</span></div>${reasons && state.badges ? `<ul class="reasons">${reasons}</ul>` : ""}<div class="zoomable" style="zoom:${state.zoom}">${inner}</div></div>`;
 }
 const widthOf = p => p.device === "desktop" ? 1280 : 393;
 function viewGallery(){
