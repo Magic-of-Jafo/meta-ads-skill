@@ -30,7 +30,7 @@ Keep separate sets of ads apart: your drafts, each competitor, each campaign. Ev
 
 Ask for it in plain words: *"Start a mockup library called Acme competitors with their current ads"*, *"Add these two drafts to my Spring launch library"*. The agent creates and fills the folders, following the layout in [`SKILL.md`](skills/meta-ads/SKILL.md#libraries).
 
-A library's copy can also live in a spreadsheet, `ads.xlsx`, that you edit in Excel: one row per ad, with character counts that turn red past what Facebook Feed shows and dropdowns for the button and brand. Ask *"Give me the Spring launch copy as a spreadsheet"*. Once it exists, its text is what the mockups use; re-render to see your edits. Images and brands are still set up by the agent.
+A library's copy can also live in a spreadsheet, `ads.xlsx`, that you edit in Excel: one row per ad, with character counts that turn red past what Facebook Feed shows and dropdowns for the button and brand. Ask *"Give me the Spring launch copy as a spreadsheet"*. Once it exists, its text is what the mockups use: save in Excel and ask for a re-render (Excel can stay open). Images and brands are still set up by the agent.
 
 ## Export: a file to send, a PDF or a PowerPoint
 

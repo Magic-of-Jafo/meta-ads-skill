@@ -10,8 +10,8 @@ ads.json (check.py, render.py) reads ads.xlsx beside it and applies its copy.
 
 export writes ads.xlsx from ads.json. If ads.xlsx already exists it is the user's file, so export
 only adds rows for ads that aren't in it yet and changes nothing else. --fresh rebuilds it from
-ads.json (after copying the old one to backups/), losing edits made in the sheet that aren't in
-ads.json; use it only when the user asks.
+the current copy (the sheet's text over ads.json's), after copying the old sheet to backups/. It
+resets the layout: columns the user added and their formatting are dropped. Use it only when asked.
 
 Columns are found by their header text, so the user can reorder them and add columns of their
 own; those are ignored. Format and Source are shown for information and never read back.
@@ -121,8 +121,11 @@ def apply(spec, spec_path, rep):
     if openpyxl is None:
         rep.error("ads.xlsx", f"{sp.name} holds this library's copy, but reading it needs openpyxl: {INSTALL}")
         return None
+    import warnings
     try:
-        wb = openpyxl.load_workbook(sp, data_only=True, read_only=True)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")   # "Data Validation extension is not supported": Excel's dropdowns; harmless when reading
+            wb = openpyxl.load_workbook(sp, data_only=True, read_only=True)
     except PermissionError:
         rep.error("ads.xlsx", f"{sp} can't be read (is it locked by another program?)")
         return None
@@ -180,10 +183,10 @@ def apply(spec, spec_path, rep):
                 continue
             new, old = _clean(r.get(f)), _text(_effective(ad, defaults, f))
             if (new or None) != (old or None):
-                if new is None and f in ("label", "group", "notes", "display_link", "destination_url"):
-                    ad.pop(f, None)       # an empty cell: no value (the field's default applies)
+                if new is None and f not in defaults and f in ("label", "group", "notes", "display_link", "destination_url"):
+                    ad.pop(f, None)       # an empty cell: no value
                 else:
-                    ad[f] = new or ""     # an emptied text: no text
+                    ad[f] = new or ""     # an emptied text, or an emptied inherited value: no text
                 changed.add(aid)
         if "brand" in present:
             v = _clean(r.get("brand"))
@@ -210,6 +213,12 @@ def apply(spec, spec_path, rep):
             v = _clean(r.get("format"))
             if v and ad.get("format") and v.lower() != str(ad["format"]).lower():
                 rep.warn(f"{where}.Format", f"the format is set in ads.json ({ad['format']}); the sheet can't change it")
+
+    seen = {_clean(r.get("id")) for _n, r, _p in rows("Ads", AD_COLS)}
+    missing = [a for a in ads if a and a not in seen]
+    if missing and "Ads" in wb.sheetnames:
+        rep.warn("ads.xlsx", f"{len(missing)} ad(s) have no row in the sheet and use ads.json's copy: {', '.join(missing[:8])}"
+                 f"{'…' if len(missing) > 8 else ''} (sheet.py export adds their rows)")
 
     for n, r, present in rows("Cards", CARD_COLS):
         aid = _clean(r.get("ad"))
@@ -311,6 +320,14 @@ def _style_sheet(ws, cols, limits):
                 ws.conditional_formatting.add(f"{col}2:{col}5000", FormulaRule(formula=[f"AND(ISNUMBER({col}2),{col}2>{lim})"], fill=red, font=red_text))   # "" > n is TRUE in Excel
 
 
+def _put(cell, v):
+    """Set a value as plain text: copy that starts with = would otherwise become a formula."""
+    cell.value = v
+    if isinstance(v, str) and v.startswith("="):
+        cell.data_type = "s"
+    return cell
+
+
 def _fill_rows(ws, cols, rows, start):
     from openpyxl.styles import Alignment
     from openpyxl.utils import get_column_letter
@@ -321,22 +338,42 @@ def _fill_rows(ws, cols, rows, start):
         for j, (h, f, w, e) in enumerate(cols, start=1):
             if f:
                 v = r.get(f)
-                ws.cell(row=n, column=j, value=v if v not in ("",) else None).alignment = wrap
+                _put(ws.cell(row=n, column=j), v if v not in ("",) else None).alignment = wrap
             elif h.endswith(" length"):
                 src = h[:-len(" length")].strip().lower().replace(" ", "_")
                 ws.cell(row=n, column=j, value=f'=IF({letter[src]}{n}="","",LEN({letter[src]}{n}))').alignment = wrap
 
 
-def _validations(wb, ws, cols, start, end, lists):
+def _dropdowns(wb, brands, cta_labels):
+    """(Re)build the Button and Brand dropdowns, finding the columns by header. openpyxl can't
+    keep dropdowns Excel saved (they point at another tab, an Excel extension), so they're
+    rebuilt every time this script saves the workbook. The lists live on a hidden tab, since a
+    typed-in list is limited to 255 characters."""
     from openpyxl.utils import get_column_letter
     from openpyxl.worksheet.datavalidation import DataValidation
-    for j, (h, f, w, e) in enumerate(cols, start=1):
-        if f in lists:
-            col = get_column_letter(j)
-            dv = DataValidation(type="list", formula1=lists[f], allow_blank=True, showErrorMessage=True,
-                                errorTitle=h, error=f"Pick a {h.lower()} from the list.")
-            dv.add(f"{col}2:{col}5000")
-            ws.add_data_validation(dv)
+    ls = wb["Lists"] if "Lists" in wb.sheetnames else wb.create_sheet("Lists")
+    ls.delete_cols(1, 2)
+    labels = [NO_BUTTON] + [l for c, l in cta_labels.items() if c != "NO_BUTTON"]
+    names = [(b.get("page_name") or k) for k, b in brands.items()] or [""]
+    for i, l in enumerate(labels, start=1):
+        ls.cell(row=i, column=1, value=l)
+    for i, nm in enumerate(names, start=1):
+        ls.cell(row=i, column=2, value=nm)
+    ls.sheet_state = "hidden"
+    lists = {"button": f"Lists!$A$1:$A${len(labels)}", "brand": f"Lists!$B$1:$B${len(names)}"}
+    for tab, want in (("Ads", ("button", "brand")), ("Cards", ("button",))):
+        if tab not in wb.sheetnames:
+            continue
+        ws = wb[tab]
+        ws.data_validations.dataValidation = []
+        for j, c in enumerate(ws[1], start=1):
+            h = str(c.value or "").strip().lower()
+            if h in want:
+                col = get_column_letter(j)
+                dv = DataValidation(type="list", formula1=lists[h], allow_blank=True, showErrorMessage=True,
+                                    errorTitle=h.capitalize(), error=f"Pick a {h} from the list.")
+                dv.add(f"{col}2:{col}5000")
+                ws.add_data_validation(dv)
 
 
 def export(target, fresh=False):
@@ -356,8 +393,11 @@ def export(target, fresh=False):
     limits = _limits()
 
     if sp.exists() and not fresh:
+        import warnings
         try:
-            wb = openpyxl.load_workbook(sp)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")   # Excel's dropdowns: rebuilt below
+                wb = openpyxl.load_workbook(sp)
         except PermissionError:
             sys.exit(f"{sp} is open in another program (Excel?). Close it and run this again.")
         ws = wb["Ads"] if "Ads" in wb.sheetnames else None
@@ -382,7 +422,7 @@ def export(target, fresh=False):
             r, n = _ad_row(a, defaults, brands, cta_labels), start + i
             for j, f in enumerate(order, start=1):
                 if f:
-                    ws.cell(row=n, column=j, value=r.get(f)).alignment = wrap
+                    _put(ws.cell(row=n, column=j), r.get(f)).alignment = wrap
                 elif heads[j - 1].endswith(" length"):
                     src = heads[j - 1][:-len(" length")].strip().replace(" ", "_")
                     if src in order:
@@ -396,6 +436,7 @@ def export(target, fresh=False):
                 _style_sheet(cw, CARD_COLS, limits)
             cw = wb["Cards"]
             _fill_rows(cw, CARD_COLS, card_rows, cw.max_row + 1)
+        _dropdowns(wb, brands, cta_labels)
         try:
             wb.save(sp)
         except PermissionError:
@@ -404,6 +445,12 @@ def export(target, fresh=False):
         return sp
 
     if sp.exists():
+        # rebuild from the copy as it is now: the sheet's text over ads.json's
+        rep = metaads.Report()
+        apply(spec, spec_path, rep)
+        for e in rep.errors:
+            sys.exit(f"Can't read the current sheet to keep its edits: {e['message']}")
+        ads = [a for a in (spec.get("ads") or []) if isinstance(a, dict) and a.get("id")]
         bdir = sp.parent / "backups"
         bdir.mkdir(exist_ok=True)
         b = bdir / f"ads-{dt.datetime.now():%Y-%m-%d-%H%M%S}.xlsx"
@@ -422,19 +469,7 @@ def export(target, fresh=False):
         cw.append([h for h, *_ in CARD_COLS])
         _fill_rows(cw, CARD_COLS, card_rows, 2)
         _style_sheet(cw, CARD_COLS, limits)
-    # lists for the dropdowns, on a hidden tab (a typed-in list is limited to 255 characters)
-    ls = wb.create_sheet("Lists")
-    labels = [NO_BUTTON] + [l for c, l in cta_labels.items() if c != "NO_BUTTON"]
-    names = [(b.get("page_name") or k) for k, b in brands.items()]
-    for i, l in enumerate(labels, start=1):
-        ls.cell(row=i, column=1, value=l)
-    for i, nm in enumerate(names, start=1):
-        ls.cell(row=i, column=2, value=nm)
-    ls.sheet_state = "hidden"
-    lists = {"cta": f"Lists!$A$1:$A${len(labels)}", "brand": f"Lists!$B$1:$B${max(1, len(names))}"}
-    _validations(wb, ws, AD_COLS, 2, len(ads) + 1, lists)
-    if card_rows:
-        _validations(wb, wb["Cards"], CARD_COLS, 2, len(card_rows) + 1, {"cta": lists["cta"]})
+    _dropdowns(wb, brands, cta_labels)
     ab = wb.create_sheet("About")
     name = (spec.get("campaign") or {}).get("name") or spec_path.parent.name
     lines = [
@@ -468,7 +503,7 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     e = sub.add_parser("export", help="write ads.xlsx from ads.json (adds new ads only if it exists)")
     e.add_argument("target", help="a library folder or an ads.json")
-    e.add_argument("--fresh", action="store_true", help="rebuild the sheet from ads.json (backs up the old one)")
+    e.add_argument("--fresh", action="store_true", help="rebuild the sheet from the current copy (backs up the old one; drops added columns)")
     a = ap.parse_args()
     if a.cmd == "export":
         export(a.target, a.fresh)
