@@ -241,6 +241,8 @@ def main():
         (out / library.SUMMARY).write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
         libs = library.write_index(lib_root)
     print(f"Rendered {len(ads)} ads into {out}")
+    if rep.sheet:
+        print(f"  copy from {rep.sheet['path']} ({rep.sheet['ads_changed']} ad(s) differ from ads.json)")
     print(f"  {c.get('actual',0)} actual, {c.get('simulated',0)} simulated, {c.get('not_eligible',0)} not eligible mockups")
     print(f"  media: {stored} referenced files -> {unique_files} unique files in media/")
     if rep.warnings:

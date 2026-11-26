@@ -30,6 +30,8 @@ Keep separate sets of ads apart: your drafts, each competitor, each campaign. Ev
 
 Ask for it in plain words: *"Start a mockup library called Acme competitors with their current ads"*, *"Add these two drafts to my Spring launch library"*. The agent creates and fills the folders, following the layout in [`SKILL.md`](skills/meta-ads/SKILL.md#libraries).
 
+A library's copy can also live in a spreadsheet, `ads.xlsx`, that you edit in Excel: one row per ad, with character counts that turn red past what Facebook Feed shows and dropdowns for the button and brand. Ask *"Give me the Spring launch copy as a spreadsheet"*. Once it exists, its text is what the mockups use; re-render to see your edits. Images and brands are still set up by the agent.
+
 ## Export: a file to send, a PDF or a PowerPoint
 
 To choose ads, click **Select ads** (top right). Each ad gets a checkbox; tick the ones you want, then click **Export selected**. Your selection is kept per library, even after closing the page.
@@ -112,6 +114,7 @@ Use one option, not both, or you'll have two copies of the skill.
 - **[ffmpeg / ffprobe](https://ffmpeg.org/download.html)** on your PATH, for video ads (measuring and cover frames)
 - **Chrome or Edge**, for PNG and PDF export. If it isn't found automatically, give its path with `--browser`.
 - **[python-pptx](https://python-pptx.readthedocs.io/en/latest/user/install.html)**, only for PowerPoint decks Claude makes (the viewer's Save PowerPoint doesn't need it)
+- **[openpyxl](https://openpyxl.readthedocs.io/en/stable/#installation)**, only for libraries whose copy is in a spreadsheet (`ads.xlsx`)
 
 ## What it runs, sends and fetches
 
@@ -122,6 +125,7 @@ Everything runs locally on your machine. The plugin has no hooks, no MCP servers
   - `render.py` copies your media into the output folder (a library's `viewer/`, or `meta-ads-output/<campaign>-<date>/` in the current folder) and writes the viewer (`index.html`, `data.js`) there. For a library it also rewrites `index.html` and `libraries.js` in the library root (`meta-ads/`).
   - `share.py` writes a single-file copy of a viewer (images embedded, videos as cover frames) into the library's `exports/` folder. The viewer's **Save file** makes the same file in the browser, from scaled copies of the images that `render.py` writes to `viewer/embed/`. Neither sends anything; you decide where the file goes.
   - `deck.py` makes PDF and PowerPoint decks in the same `exports/` folder. It screenshots the mockups with headless Chrome or Edge, has the browser print the slides to PDF, and writes the `.pptx` with python-pptx. Working images go in `exports/.build/`.
+  - `sheet.py` writes a library's copy to `ads.xlsx` beside its `ads.json`. Afterwards it only adds rows for new ads; rebuilding it (`--fresh`) first copies the old sheet to `backups/`. `check.py` and `render.py` read the sheet when it's there.
   - `library.py` creates library folders under `meta-ads/` and rewrites that folder's `index.html` and `libraries.js`. It deletes nothing.
   - `export_png.py` saves PNGs into that folder's `png/` subfolder.
   - `sync_spec.py` is a maintenance script that regenerates tables in the docs.

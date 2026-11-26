@@ -32,6 +32,8 @@ def run(spec_path, out_dir=None, quiet=False):
     (out / "inventory.json").write_text(json.dumps(inv, indent=2, ensure_ascii=False), encoding="utf-8")
     (out / "inventory.md").write_text(metaads.inventory_md(res, inv), encoding="utf-8")
     if not quiet:
+        if rep.sheet:
+            print(f"Copy from {rep.sheet['path']} ({rep.sheet['ads_changed']} ad(s) differ from ads.json)")
         summarize(res, inv, out)
     return res, inv, rep
 

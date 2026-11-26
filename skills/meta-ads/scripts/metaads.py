@@ -146,6 +146,7 @@ class Report:
     def __init__(self):
         self.errors: list[dict] = []
         self.warnings: list[dict] = []
+        self.sheet: dict | None = None   # set when ads.xlsx supplied the copy
 
     def error(self, where: str, msg: str):
         self.errors.append({"where": where, "message": msg})
@@ -169,6 +170,9 @@ def load_spec(path: str | os.PathLike) -> tuple[dict | None, Path, Report]:
     if not isinstance(spec, dict):
         rep.error("file", "top level must be a JSON object")
         return None, p, rep
+    # ads.xlsx beside ads.json holds the user's copy; its text wins (see sheet.py)
+    import sheet  # noqa: E402  (here, not at the top: sheet imports this module)
+    rep.sheet = sheet.apply(spec, p, rep)
     return spec, p, rep
 
 
