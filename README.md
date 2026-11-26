@@ -37,6 +37,7 @@ To show the mockups to someone, ask for a **single-file share**: *"Make a sharea
 - Videos appear as their cover frame. The share is for judging how each ad looks on the device (text against image, margins, safe areas), and it keeps the file small.
 - You can share only some ads. Images are scaled to phone-mockup size unless you ask for full resolution.
 - Open the file in the browser, not in a web preview such as Google Drive's, which won't run it.
+- Opened where it was made (the library's `share/` folder), it links back to the full library and to all libraries. A copy you send shows no links.
 
 Team access through a shared folder, with videos playing, is planned: see [`docs/specs/shared-folder-libraries.md`](docs/specs/shared-folder-libraries.md).
 

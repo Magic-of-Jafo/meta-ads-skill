@@ -124,7 +124,11 @@ def main():
                 else:
                     print(f"  missing file for {mid}.{k}: {v}")
                     m.pop(k, None)
-    data["share"] = {"created": dt.datetime.now().isoformat(timespec="minutes"), "videos_as_frames": videos}
+    in_library = src.name == "viewer" and (src.parent / "ads.json").exists()
+    # The library's folder name lets the copy link back to the library and home page when it's opened
+    # where it was made (<library>/share/). Sent elsewhere, those files don't exist and no links show.
+    data["share"] = {"created": dt.datetime.now().isoformat(timespec="minutes"), "videos_as_frames": videos,
+                     "library": src.parent.name if in_library else None}
 
     html = (src / "index.html").read_text(encoding="utf-8")
     payload = "window.META_ADS = " + json.dumps(data, ensure_ascii=False).replace("</", "<\\/") + ";"

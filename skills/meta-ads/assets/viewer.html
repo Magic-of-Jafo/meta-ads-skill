@@ -931,6 +931,10 @@ function libCtl(){
   const shared = D.share ? `<span class="fixed" style="cursor:help" title="A single-file copy made ${esc((D.share.created || "").replace("T", " "))}, for review. These are mockups, not live ads.${D.share.videos_as_frames ? " Videos are shown as their cover frame, to judge layout, text and margins." : ""}">Shared copy${D.share.videos_as_frames ? " · videos as still frames" : ""}</span>` : "";
   const title = `<h1>${esc(D.campaign.name || "Ad mockups")}</h1>${shared}`;
   const libs = (LIBS && LIBS.libraries || []).filter(l => l.rendered);
+  if (D.share) {   // a single-file copy: links back only when opened where it was made
+    if (!libs.some(l => l.id === D.share.library)) return title;
+    return `${title}<a class="ib" href="../viewer/index.html" title="This library's own viewer${D.share.videos_as_frames ? ", with videos playing" : ""}">Open full library</a><a class="ib" href="../../index.html" title="All libraries, with what's in each">All libraries</a>`;
+  }
   if (!LIB_ID || !LIBS) return title;
   const home = `<a class="ib" href="../../index.html" title="All libraries, with what's in each">All libraries</a>`;
   if (libs.length < 2) return `${title}${home}`;
@@ -1080,7 +1084,7 @@ function exportView(){
 if (!/^#export/.test(location.hash)) loadPrefs();
 readHash();
 if (state.export) exportView(); else go();
-if (LIB_ID && !state.export) {
+if ((LIB_ID || (D.share && D.share.library)) && !state.export) {
   const s = document.createElement("script");
   s.src = "../../libraries.js?v=" + Date.now();   // fresh list even if another library was rendered since
   s.onload = () => { LIBS = window.META_ADS_LIBRARIES || null; toolbar(); };
