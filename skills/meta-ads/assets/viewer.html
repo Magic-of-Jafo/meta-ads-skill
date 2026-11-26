@@ -1650,7 +1650,12 @@ const idb = (fn) => new Promise((ok, bad) => {
 });
 const idbGet = k => idb(st => st.get(k)), idbSet = (k, v) => idb(st => st.put(v, k)), idbDel = k => idb(st => st.delete(k));
 /* .xlsx is a zip of XML. Read the central directory; inflate with the browser's own decompressor. */
-const xmlDoc = t => new DOMParser().parseFromString(t, "application/xml");
+const XML_DECL = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n';
+const stripDecl = t => String(t).replace(/^\uFEFF?(\s*<\?xml[^>]*\?>)+\s*/, "");   // v1.13.0–1 could write the declaration twice
+const xmlDoc = t => new DOMParser().parseFromString(stripDecl(t), "application/xml");
+const xmlOk = doc => !doc.getElementsByTagName("parsererror").length;
+/* Serialize with exactly one declaration: some browsers add their own, some don't. */
+const xmlOut = doc => XML_DECL + stripDecl(new XMLSerializer().serializeToString(doc));
 const byTag = (el, tag) => [...el.getElementsByTagNameNS("*", tag)];
 const xText = s => String(s).replace(/_x([0-9A-Fa-f]{4})_/g, (m, h) => String.fromCharCode(parseInt(h, 16))).replace(/\r\n?/g, "\n");
 const colIndex = ref => { let n = 0; for (const ch of ref.replace(/\d+$/, "")) n = n * 26 + ch.toUpperCase().charCodeAt(0) - 64; return n - 1; };
@@ -1742,12 +1747,13 @@ async function sheetWrite(patches){
   const fh = await SHEET.dir.getFileHandle(D.sheet.file);
   const buf = await (await fh.getFile()).arrayBuffer();   // the file as it is now: edits made in Excel since are kept
   const x = await xlsxOpen(buf), changed = {}, missing = [];
-  const decl = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n';
+  if (!Object.keys(x.sheets).length) throw new Error(`can’t read ${D.sheet.file} (its list of tabs is unreadable); nothing was written`);
   for (const tab of ["Ads", "Cards"]) {
     const ps = patches.filter(p => p.tab === tab);
     if (!ps.length) continue;
     if (!x.sheets[tab]) { missing.push(...ps); continue; }
     const doc = xmlDoc(await x.text(x.sheets[tab]));
+    if (!xmlOk(doc)) throw new Error(`can’t read the ${tab} tab of ${D.sheet.file}; nothing was written`);
     const rows = byTag(doc, "row"), head = rows.find(r => r.getAttribute("r") === "1") || rows[0];
     const cols = {};
     for (const c of byTag(head || doc, "c")) { const v = cellText(c, x.shared); if (v) cols[v.trim().toLowerCase()] = colIndex(c.getAttribute("r")); }
@@ -1759,11 +1765,12 @@ async function sheetWrite(patches){
       if (col == null || !row) { missing.push(p); continue; }
       setCell(doc, row, col, p.value);
     }
-    changed[x.sheets[tab]] = decl + new XMLSerializer().serializeToString(doc);
+    changed[x.sheets[tab]] = xmlOut(doc);
   }
   if (!Object.keys(changed).length) return {missing, wrote: false};
   // have Excel recalculate on opening, so the length columns match the new text
   const wb = xmlDoc(await x.text("xl/workbook.xml"));
+  if (!xmlOk(wb)) throw new Error(`can’t read ${D.sheet.file}; nothing was written`);
   let calc = byTag(wb, "calcPr")[0];
   if (!calc) {
     calc = wb.createElementNS(wb.documentElement.namespaceURI, "calcPr");
@@ -1771,7 +1778,7 @@ async function sheetWrite(patches){
     after.parentNode.insertBefore(calc, after.nextSibling);
   }
   calc.setAttribute("fullCalcOnLoad", "1");
-  changed["xl/workbook.xml"] = decl + new XMLSerializer().serializeToString(wb);
+  changed["xl/workbook.xml"] = xmlOut(wb);
   if (!SHEET.backedUp) {   // a copy of the sheet as it was, before the first save of this session
     const bd = await SHEET.dir.getDirectoryHandle("backups", {create: true});
     const n = new Date(), pad = v => String(v).padStart(2, "0");
@@ -1786,8 +1793,19 @@ async function sheetWrite(patches){
     const raw = new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer());
     out.push({name: en.name, method: 8, crc: crc32(data), usize: data.length, raw});
   }
+  const blob = zipRaw(out, XLSX_MIME);
+  // check the new file before it replaces the old one: every part parses and every edited cell reads back
+  const check = await xlsxOpen(await blob.arrayBuffer());
+  for (const name of Object.keys(changed)) if (!xmlOk(xmlDoc(await check.text(name)))) throw new Error("the new sheet didn’t check out; nothing was written");
+  const back = await readXlsx(await blob.arrayBuffer());
+  for (const p of patches.filter(p => !missing.includes(p))) {
+    const rows = back[p.tab] || [], head = (rows[0] || []).map(h => String(h || "").trim().toLowerCase());
+    const ic = head.indexOf(p.tab === "Ads" ? "id" : "ad id"), cc = head.indexOf("card"), fc = head.indexOf(p.head.toLowerCase());
+    const row = rows.slice(1).find(r => r && String(r[ic] || "").trim() === p.id && (p.tab === "Ads" || String(r[cc]) === String(p.card)));
+    if (!row || (row[fc] ?? "") !== String(p.value ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")) throw new Error(`the new sheet didn’t read back ${p.head} of ${p.id}; nothing was written`);
+  }
   const w = await fh.createWritable();
-  await w.write(zipRaw(out, XLSX_MIME));
+  await w.write(blob);
   await w.close();
   const f2 = await fh.getFile();
   SHEET.lastMod = f2.lastModified; SHEET.saved = new Date(f2.lastModified);
@@ -2019,8 +2037,8 @@ async function edSave(){
   const batch = new Map(EDIT.pending), patches = [...batch.values()];
   try {
     const r = await sheetWrite(patches);
-    for (const [k, p] of batch) if (EDIT.pending.get(k) === p) EDIT.pending.delete(k);
-    if (r.missing.length) edStatus(`Saved, except ${r.missing.length} field${r.missing.length === 1 ? "" : "s"} with no row or column in the sheet (${esc(r.missing.map(p => p.id).join(", "))}). Ask Claude to re-render to add them.`, "warn");
+    for (const [k, p] of batch) if (EDIT.pending.get(k) === p && !r.missing.includes(p)) EDIT.pending.delete(k);   // unsaved ones stay
+    if (r.missing.length) edStatus(`Not saved: ${r.missing.map(p => `${p.head} of ${p.id}`).join(", ")}. The sheet has no row or column for ${r.missing.length === 1 ? "it" : "them"}; ask Claude to re-render, then edit again. ${r.wrote ? "Everything else is saved." : ""}`, "warn");
     else edStatus(`Saved to ${D.sheet.file} at ${fmtTime(SHEET.saved)}.`, "");
     SHEET.changed = countChanged();   // so the Copy menu and export requests know the sheet moved on
     toolbar();
@@ -2030,6 +2048,8 @@ async function edSave(){
     else if (name === "NoModificationAllowedError" || name === "InvalidStateError" || /lock|in use|being used|modif/i.test(m)) {
       edStatus(`Waiting to save: ${D.sheet.file} is open in Excel. Close it there and your edits are saved here (don’t save it in Excel, or Excel’s copy replaces these edits).`, "warn");
       EDIT.retry = setTimeout(edSave, 3000);
+    } else if (/can’t read|didn’t check out|didn’t read back/.test(m)) {
+      edStatus("Couldn’t save: " + m + ". Your edits are kept here. The previous version is in the library’s backups folder.", "err");
     } else { edStatus("Couldn’t save: " + m + ". Your edits are kept here; it tries again in a few seconds.", "err"); EDIT.retry = setTimeout(edSave, 5000); }
   } finally {
     EDIT.saving = false;
