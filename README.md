@@ -30,7 +30,7 @@ Keep separate sets of ads apart: your drafts, each competitor, each campaign. Ev
 
 Ask for it in plain words: *"Start a mockup library called Acme competitors with their current ads"*, *"Add these two drafts to my Spring launch library"*. The agent creates and fills the folders, following the layout in [`SKILL.md`](skills/meta-ads/SKILL.md#libraries).
 
-Your original documents are read once, when the agent builds the library. After that, each library's **copy lives in a spreadsheet**, `ads.xlsx`, made on its first render: one row per ad, with character counts that turn red past what Facebook Feed shows and dropdowns for the button and brand. Edit the wording there, save, and ask for a re-render (Excel can stay open). New ads get their rows automatically and your edits are never overwritten. Images and brands are still set up by the agent.
+Your original documents are read once, when the agent builds the library. After that, each library's **copy lives in a spreadsheet**, `ads.xlsx`, made on its first render: one row per ad, with character counts that turn red past what Facebook Feed shows and dropdowns for the button and brand. Edit the wording there and save. In Chrome or Edge, the viewer's **Copy** menu can connect to the sheet (you pick the library folder once per browser session), and the mockups then update a few seconds after each save in Excel, with no re-render. Otherwise ask for a re-render (Excel can stay open). New ads get their rows automatically and your edits are never overwritten. Images and brands are still set up by the agent.
 
 ## Export: a file to send, a PDF or a PowerPoint
 
@@ -131,7 +131,7 @@ Everything runs locally on your machine. The plugin has no hooks, no MCP servers
   - `sync_spec.py` is a maintenance script that regenerates tables in the docs.
 - **ffprobe / ffmpeg**, if installed, read video dimensions and save one cover frame per video.
 - **Chrome or Edge, headless**, opens the local `index.html` to take the PNG screenshots, using a temporary profile folder that is deleted afterwards.
-- **Network:** the only network access is downloading media you list in `ads.json` as `http(s)://` URLs. Each file is fetched once with a plain GET into the output folder. Nothing is uploaded or sent anywhere, and the viewer page loads nothing from the web. The viewer keeps your settings in the browser's local storage on your machine.
+- **Network:** the only network access is downloading media you list in `ads.json` as `http(s)://` URLs. Each file is fetched once with a plain GET into the output folder. Nothing is uploaded or sent anywhere, and the viewer page loads nothing from the web. The viewer keeps your settings in the browser's local storage on your machine. If you connect it to a library's `ads.xlsx`, it reads that one file from the folder you choose (the browser asks first) and remembers the folder in the browser's storage; it never writes there.
 
 ## Try it
 

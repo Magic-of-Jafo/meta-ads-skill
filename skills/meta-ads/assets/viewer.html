@@ -902,7 +902,7 @@ function toolbar(){
     <p><span class="dot simulated"></span><b>Simulated</b>: something was approximated, usually an image in the wrong shape (cropped, padded or blurred to fit) or placeholder creative. Hover a status to see why.</p>
     <p><span class="dot not_eligible"></span><b>Not eligible</b>: Meta doesn’t run this kind of ad in that placement.</p>
     <p style="color:var(--ui-sub)">Keys: ← → step through ads (or placements in Compare ads).</p>`;
-  $("#bar").innerHTML = `<div class="row">${libCtl()}
+  $("#bar").innerHTML = `<div class="row">${libCtl()}${SHEET_ON ? menu("sheet", `${sheetSummary()} ${chev}`, sheetBody()) : ""}
     <span class="seg" role="tablist">${MODES.map(([v, l, d]) => `<button data-mode="${v}" class="${state.mode===v?"on":""}" role="tab" aria-selected="${state.mode===v}">${l}<small>${d}</small></button>`).join("")}</span>
     <span class="rhs">${D.share ? "" : `<button class="ib${SELECTING ? " on" : ""}" data-selmode aria-pressed="${SELECTING}" title="Tick the ads you want in a PDF, PowerPoint or file">${SELECTING ? "✓ Selecting ads" : "☐ Select ads"}</button>`}${D.share ? "" : menu("export", `Export${EXP.picked.size && EXP.scope === "pick" ? ` <span class="nbadge">${EXP.picked.size}</span>` : ""} ${chev}`, expBody, true)}${menu("key", `<span><span class="dot actual"></span>Actual</span><span><span class="dot simulated"></span>Simulated</span><span>What’s this?</span>`, keyBody, true)}
     <button class="ib${state.dark ? " on" : ""}" data-dark aria-pressed="${state.dark}" title="Dark theme for the mockups and this viewer">${state.dark ? "☀ Light mode" : "☾ Dark mode"}</button></span></div>
@@ -918,6 +918,7 @@ function toolbar(){
   bar.querySelectorAll("[data-tog]").forEach(c => c.onchange = () => { state[c.dataset.tog] = c.checked; go(); });
   bindExport(bar, adsF);
   bindSelect(bar, adsF);
+  if (SHEET_ON) bindSheet(bar);
   bar.querySelector("[data-dark]").onclick = () => { state.dark = !state.dark; go(); };
   bar.querySelectorAll("[data-step]").forEach(b => b.onclick = () => stepAd(+b.dataset.step));
   bar.querySelectorAll("[data-plstep]").forEach(b => b.onclick = () => stepPl(+b.dataset.plstep));
@@ -1008,10 +1009,11 @@ function expRequest(adsF){
   const lib = LIB_ID ? viewer.replace(/\/viewer$/, "") : viewer;
   const name = D.campaign.name || "ad mockups";
   const ids = ads.length === D.ads.length ? "" : ` --ads ${ads.map(a => a.id).join(",")}`;
-  if (EXP.fmt === "file") return `Export the “${name}” mockups as a single shareable file with the meta-ads skill: share.py "${viewer}"${ids}`;
+  const pre = SHEET.status === "live" && SHEET.changed ? `Re-render the “${name}” library (its ${D.sheet.file} changed), then e` : "E";
+  if (EXP.fmt === "file") return `${pre}xport the “${name}” mockups as a single shareable file with the meta-ads skill: share.py "${viewer}"${ids}`;
   const pls = EXP.layout === "concept" ? EXP.pls.filter(Boolean) : [EXP.one || state.pl];
   const title = (EXP.title || name).replace(/"/g, "'");
-  return `Export the “${name}” mockups as ${EXP.fmt === "pdf" ? "a PDF" : "a PowerPoint"} with the meta-ads skill: deck.py quick --library "${lib}" --format ${EXP.fmt} --layout ${EXP.layout} --placements ${pls.join(",")}${ids} --title "${title}"${state.dark ? " --dark" : ""}`;
+  return `${pre}xport the “${name}” mockups as ${EXP.fmt === "pdf" ? "a PDF" : "a PowerPoint"} with the meta-ads skill: deck.py quick --library "${lib}" --format ${EXP.fmt} --layout ${EXP.layout} --placements ${pls.join(",")}${ids} --title "${title}"${state.dark ? " --dark" : ""}`;
 }
 /* An exported file, with Open and Show folder buttons like Chrome's downloads. A browser can't
    show a PowerPoint file, so a plain link to one downloads it again; Office's own link type
@@ -1105,6 +1107,7 @@ function shareHtml(ads){
   const keep = new Set(ads.map(a => a.id));
   const data = JSON.parse(JSON.stringify(D));
   delete data.share;
+  delete data.sheet;
   data.ads = data.ads.filter(a => keep.has(a.id));
   data.matrix = Object.fromEntries(Object.entries(data.matrix).filter(([k]) => keep.has(k)));
   const brands = new Set(data.ads.map(a => a.brand));
@@ -1599,6 +1602,234 @@ function bindExport(bar, adsF){
    <meta name="meta-ads-library">. The shared list is ../../libraries.js, loaded after first paint. */
 const LIB_ID = document.querySelector('meta[name="meta-ads-library"]')?.content || null;
 let LIBS = null;
+/* ------------------------------------------------------------------ The copy sheet, live
+   A library's copy lives in ads.xlsx beside ads.json (sheet.py); render.py bakes it into data.js
+   and records the sheet in D.sheet. To show edits without a re-render, the viewer reads the sheet
+   itself: the user picks the library folder once (the browser asks), the folder is remembered in
+   IndexedDB, and the sheet is checked every 2 s, so saving in Excel updates the mockups. Only the
+   words change here; new ads, images and brands still need a re-render. Mirrors sheet.apply. */
+const SHEET_ON = !!(D.sheet && LIB_ID && !D.share);
+const SHEET_API = !!(window.showDirectoryPicker && window.indexedDB);
+const SHEET = {status: "off", dir: null, lastMod: 0, saved: null, changed: 0, unknown: [], msg: "", fails: 0, timer: null};
+const COPY_FIELDS = ["label", "group", "brand", "primary_text", "headline", "description", "cta", "display_link", "destination_url", "notes"];
+const CARD_COPY = ["headline", "description", "cta", "display_link", "destination_url"];
+const BASE_COPY = Object.fromEntries(D.ads.map(a => [a.id, {
+  ...Object.fromEntries(COPY_FIELDS.map(f => [f, a[f]])),
+  cards: (a.cards || []).map(c => Object.fromEntries(CARD_COPY.map(f => [f, c[f]]))),
+}]));
+const idb = (fn) => new Promise((ok, bad) => {
+  const r = indexedDB.open("meta-ads", 1);
+  r.onupgradeneeded = () => r.result.createObjectStore("handles");
+  r.onerror = () => bad(r.error);
+  r.onsuccess = () => { const tx = r.result.transaction("handles", "readwrite"), st = tx.objectStore("handles"), q = fn(st); tx.oncomplete = () => { r.result.close(); ok(q && q.result); }; tx.onerror = () => bad(tx.error); };
+});
+const idbGet = k => idb(st => st.get(k)), idbSet = (k, v) => idb(st => st.put(v, k)), idbDel = k => idb(st => st.delete(k));
+/* .xlsx is a zip of XML. Read the central directory, inflate with the browser's own decompressor. */
+async function unzipXlsx(buf){
+  const dv = new DataView(buf), u8 = new Uint8Array(buf), dec = new TextDecoder();
+  let e = buf.byteLength - 22;
+  while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error("not an .xlsx file");
+  const n = dv.getUint16(e + 10, true);
+  let p = dv.getUint32(e + 16, true);
+  const files = {};
+  for (let i = 0; i < n; i++) {
+    const method = dv.getUint16(p + 10, true), size = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true);
+    const xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    const name = dec.decode(u8.subarray(p + 46, p + 46 + nl));
+    files[name] = {method, size, off};
+    p += 46 + nl + xl + cl;
+  }
+  return async name => {
+    const f = files[name];
+    if (!f) return null;
+    const start = f.off + 30 + dv.getUint16(f.off + 26, true) + dv.getUint16(f.off + 28, true);
+    const raw = u8.subarray(start, start + f.size);
+    if (f.method === 0) return dec.decode(raw);
+    if (f.method !== 8) throw new Error("unsupported compression in " + name);
+    return await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+  };
+}
+const xmlDoc = t => new DOMParser().parseFromString(t, "application/xml");
+const byTag = (el, tag) => [...el.getElementsByTagNameNS("*", tag)];
+const xText = s => String(s).replace(/_x([0-9A-Fa-f]{4})_/g, (m, h) => String.fromCharCode(parseInt(h, 16))).replace(/\r\n?/g, "\n");
+const colIndex = ref => { let n = 0; for (const ch of ref.replace(/\d+$/, "")) n = n * 26 + ch.toUpperCase().charCodeAt(0) - 64; return n - 1; };
+/* Tabs by name -> rows of cell text (row 0 is the header). Formulas give their saved result. */
+async function readXlsx(buf){
+  const get = await unzipXlsx(buf);
+  const wb = xmlDoc(await get("xl/workbook.xml") || "<x/>");
+  const rels = xmlDoc(await get("xl/_rels/workbook.xml.rels") || "<x/>");
+  const target = Object.fromEntries(byTag(rels, "Relationship").map(r => [r.getAttribute("Id"), r.getAttribute("Target")]));
+  const ssXml = await get("xl/sharedStrings.xml");
+  const shared = ssXml ? byTag(xmlDoc(ssXml), "si").map(si => byTag(si, "t").filter(t => !t.closest || !t.closest("rPh")).map(t => t.textContent).join("")) : [];
+  const tabs = {};
+  for (const sh of byTag(wb, "sheet")) {
+    const name = sh.getAttribute("name"), rid = sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id") || sh.getAttribute("r:id");
+    if (!["Ads", "Cards"].includes(name) || !target[rid]) continue;
+    const path = target[rid].startsWith("/") ? target[rid].slice(1) : "xl/" + target[rid].replace(/^\.\//, "");
+    const doc = xmlDoc(await get(path) || "<x/>");
+    const rows = [];
+    for (const row of byTag(doc, "row")) {
+      const r = (+row.getAttribute("r") || rows.length + 1) - 1, cells = [];
+      let k = 0;
+      for (const c of byTag(row, "c")) {
+        const ref = c.getAttribute("r"), j = ref ? colIndex(ref) : k, t = c.getAttribute("t");
+        const v = byTag(c, "v")[0];
+        let val = null;
+        if (t === "s") val = v ? shared[+v.textContent] : null;
+        else if (t === "inlineStr") val = byTag(c, "t").map(x => x.textContent).join("");
+        else if (v) val = v.textContent;
+        if (val != null && val !== "") cells[j] = xText(val);
+        k = j + 1;
+      }
+      rows[r] = cells;
+    }
+    tabs[name] = rows;
+  }
+  return tabs;
+}
+const domainOf = url => { if (!url) return null; try { const h = new URL(url.includes("//") ? url : "https://" + url).hostname; return h.startsWith("www.") ? h.slice(4) : h || null; } catch (e) { return null; } };
+function copyChecks(ad, p){   // metaads.copy_checks
+  const notes = [], t = p.text || {}, len = x => [...(x || "")].length;
+  const pt = ad.primary_text || "", lim = (t.primary_text || {}).chars;
+  if (pt && lim && len(pt) > lim && (t.primary_text.show ?? true)) notes.push(`primary text ${len(pt)} chars; truncates around ${lim} with '${t.primary_text.more || "…See more"}'`);
+  for (const f of ["headline", "description"]) {
+    const cfg = t[f] || {};
+    let v = ad[f] || "";
+    if (ad.format === "carousel") v = (ad.cards || []).map(c => c[f] || "").reduce((a, b) => len(b) > len(a) ? b : a, "");
+    if (v && cfg.show && cfg.chars && len(v) > cfg.chars) notes.push(`${f} ${len(v)} chars; recommended ≤ ${cfg.chars} here`);
+  }
+  return notes;
+}
+/* Put the sheet's copy over the copy as rendered (data.js), like sheet.apply over ads.json. */
+function applySheet(tabs){
+  const HEAD = {"id": "id", "ad name": "label", "group": "group", "brand": "brand", "primary text": "primary_text", "headline": "headline",
+    "description": "description", "button": "cta", "display link": "display_link", "destination url": "destination_url", "notes": "notes", "ad id": "ad", "card": "card"};
+  const byLabel = Object.fromEntries(Object.entries(D.cta || {}).map(([c, l]) => [l.toLowerCase(), c]));
+  const code = v => { if (v == null || !v.trim()) return null; const s = v.trim(); if (["no button", "no_button", "none"].includes(s.toLowerCase())) return "NO_BUTTON"; const c = s.toUpperCase().replace(/ /g, "_"); return (D.cta || {})[c] ? c : byLabel[s.toLowerCase()] || false; };
+  const brandId = v => { if (!v) return null; if (D.brands[v]) return v; const e = Object.entries(D.brands).find(([k, b]) => (b.page_name || "").toLowerCase() === v.toLowerCase()); return e ? e[0] : false; };
+  const table = rows => { const head = (rows[0] || []).map(h => HEAD[String(h || "").trim().toLowerCase()]); return rows.slice(1).filter(r => r && r.some(x => x != null)).map(r => Object.fromEntries(head.map((f, i) => [f, r[i]]).filter(([f]) => f))); };
+  // start from the rendered copy every time, so a cleared cell clears
+  for (const a of D.ads) {
+    const b = BASE_COPY[a.id];
+    for (const f of COPY_FIELDS) { if (b[f] === undefined) delete a[f]; else a[f] = b[f]; }
+    (a.cards || []).forEach((c, i) => { for (const f of CARD_COPY) { const v = (b.cards[i] || {})[f]; if (v === undefined) delete c[f]; else c[f] = v; } });
+  }
+  const unknown = [], seen = new Set();
+  for (const r of table(tabs.Ads || [])) {
+    const a = AD[r.id];
+    if (!a) { if (r.id) unknown.push(r.id); continue; }
+    seen.add(a.id);
+    for (const f of ["label", "group", "primary_text", "headline", "description", "display_link", "destination_url", "notes"]) if (f in r) a[f] = r[f] ?? "";
+    if ("brand" in r && r.brand) { const id = brandId(r.brand); if (id) a.brand = id; }
+    if ("cta" in r) { const c = code(r.cta); if (c !== false) a.cta = c === "NO_BUTTON" ? null : c; }
+    if (!a.display_link) a.display_link = domainOf(a.destination_url) || a.display_link;
+  }
+  const cardRows = table(tabs.Cards || []);
+  for (const a of D.ads) (a.cards || []).forEach((c, i) => {
+    const r = cardRows.find(x => x.ad === a.id && String(x.card) === String(i + 1));
+    if (r) {
+      for (const f of ["headline", "description", "display_link", "destination_url"]) if (f in r) c[f] = r[f] ?? "";
+      if ("cta" in r) { const k = code(r.cta); c.cta = r.cta == null ? a.cta : k === "NO_BUTTON" ? null : k === false ? c.cta : k; }
+    } else if ((BASE_COPY[a.id].cards[i] || {}).cta === BASE_COPY[a.id].cta) c.cta = a.cta;   // follows the ad's button
+  });
+  let changed = 0;
+  for (const a of D.ads) {
+    const b = BASE_COPY[a.id];
+    if (COPY_FIELDS.some(f => (a[f] ?? "") !== (b[f] ?? "")) || (a.cards || []).some((c, i) => CARD_COPY.some(f => (c[f] ?? "") !== ((b.cards[i] || {})[f] ?? "")))) changed++;
+    for (const [pl, cell] of Object.entries(D.matrix[a.id] || {})) if (cell && P[pl] && "copy" in cell) cell.copy = copyChecks(a, P[pl]);
+  }
+  return {changed, unknown};
+}
+async function sheetLoad(force){
+  try {
+    const fh = await SHEET.dir.getFileHandle(D.sheet.file);
+    const f = await fh.getFile();
+    if (!force && f.lastModified === SHEET.lastMod) return;
+    const r = applySheet(await readXlsx(await f.arrayBuffer()));
+    Object.assign(SHEET, {status: "live", lastMod: f.lastModified, saved: new Date(f.lastModified), changed: r.changed, unknown: r.unknown, msg: "", fails: 0});
+    go();
+  } catch (e) {
+    if (e && e.name === "NotAllowedError") { SHEET.status = "click"; stopSheetPoll(); toolbar(); return; }
+    if (e && e.name === "NotFoundError") { SHEET.status = "error"; SHEET.msg = `There's no ${D.sheet.file} in that folder any more.`; stopSheetPoll(); toolbar(); return; }
+    if (++SHEET.fails >= 3) { SHEET.status = "error"; SHEET.msg = "Couldn’t read the sheet: " + (e && e.message || e); toolbar(); }   // one bad read is usually Excel mid-save
+  }
+}
+function startSheetPoll(){ stopSheetPoll(); SHEET.timer = setInterval(() => { if (!document.hidden && SHEET.status === "live") sheetLoad(false); }, 2000); }
+function stopSheetPoll(){ if (SHEET.timer) clearInterval(SHEET.timer); SHEET.timer = null; }
+async function sheetConnect(){
+  let dir;
+  try { dir = await showDirectoryPicker({id: "metaads", mode: "read"}); }
+  catch (e) { if (e && e.name === "AbortError") return; SHEET.status = "error"; SHEET.msg = "The browser didn’t allow it: " + (e && e.message || e); toolbar(); return; }
+  if (dir.name !== LIB_ID) {
+    SHEET.status = "error";
+    SHEET.msg = dir.name === "viewer" ? `That’s the viewer folder. Choose the folder above it, “${LIB_ID}”.` : `That’s “${dir.name}”. Choose this library’s folder, “${LIB_ID}”.`;
+    toolbar(); return;
+  }
+  SHEET.dir = dir;
+  try { await idbSet("lib:" + LIB_ID, dir); } catch (e) { /* remembered for this page only */ }
+  await sheetLoad(true);
+  if (SHEET.status === "live") startSheetPoll();
+}
+async function sheetResume(){   // after a reload: the browser may need a click to allow reading again
+  try { if ((await SHEET.dir.requestPermission({mode: "read"})) !== "granted") return; } catch (e) { return; }
+  await sheetLoad(true);
+  if (SHEET.status === "live") startSheetPoll();
+}
+async function sheetDisconnect(){
+  stopSheetPoll();
+  try { await idbDel("lib:" + LIB_ID); } catch (e) {}
+  SHEET.dir = null;
+  applySheet({});   // back to the copy as rendered
+  Object.assign(SHEET, {status: "off", lastMod: 0, saved: null, changed: 0, unknown: []});
+  go();
+}
+async function sheetInit(){
+  if (!SHEET_ON || !SHEET_API) return;
+  let dir = null;
+  try { dir = await idbGet("lib:" + LIB_ID); } catch (e) { return; }
+  if (!dir) return;
+  SHEET.dir = dir;
+  let perm = "prompt";
+  try { perm = await dir.queryPermission({mode: "read"}); } catch (e) {}
+  if (perm === "granted") { await sheetLoad(true); if (SHEET.status === "live") startSheetPoll(); }
+  else { SHEET.status = "click"; toolbar(); }
+}
+const sheetPath = () => { const p = libFolder().replace(/\/viewer$/, "") + "/" + D.sheet.file; return /^[A-Za-z]:\//.test(p) ? p.replace(/\//g, "\\") : p; };
+const fmtTime = d => d ? d.toLocaleString(undefined, {month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}) : "";
+function sheetSummary(){
+  const dot = {live: "actual", click: "simulated", error: "not_eligible"}[SHEET.status];
+  return `${dot ? `<span class="dot ${dot}"></span>` : ""}Copy: ${esc(D.sheet.file)}${SHEET.status === "live" ? " · live" : ""}`;
+}
+function sheetBody(){
+  const url = new URL("../" + encodeURIComponent(D.sheet.file), location.href).href, folder = new URL("../", location.href).href;
+  const rendered = fmtTime(new Date(D.sheet.saved));
+  const state_ = {
+    off: `<p class="note" style="margin:0">The mockups show the copy as it was when the library was rendered (sheet saved ${esc(rendered)}). Connect the viewer to the sheet to see your edits as soon as you save them in Excel, without asking Claude to re-render.</p>
+      ${SHEET_API ? `<div class="fld" style="justify-content:flex-start"><button class="ib pri" data-sheetconnect>Connect to ${esc(D.sheet.file)}…</button></div>
+      <p class="note" style="margin:0">Your browser asks you to choose a folder: choose this library’s folder, <b>${esc(LIB_ID)}</b> (the one with ${esc(D.sheet.file)} in it), and allow reading it. You do this once per browser session.</p>` : `<p class="note" style="margin:0">This browser can’t read files from a page. Chrome and Edge can; or ask Claude to re-render after you save.</p>`}`,
+    click: `<p class="note" style="margin:0">The viewer is connected to the sheet, but the browser needs a click to read it again after a reload.</p>
+      <div class="fld" style="justify-content:flex-start"><button class="ib pri" data-sheetresume>Load the latest copy</button><button class="ib" data-sheetoff>Disconnect</button></div>`,
+    live: `<p class="note" style="margin:0"><b>Live.</b> Showing the sheet as saved ${esc(fmtTime(SHEET.saved))}${SHEET.changed ? `: ${SHEET.changed} ad${SHEET.changed === 1 ? " differs" : "s differ"} from the last render` : ", the same as the last render"}. Save in Excel and the mockups update within a few seconds.</p>
+      ${SHEET.unknown.length ? `<p class="note" style="margin:0">${SHEET.unknown.length} row${SHEET.unknown.length === 1 ? " is" : "s are"} for ads this viewer doesn’t have yet (${esc(clip(SHEET.unknown.join(", "), 60))}). New ads, images and brands need a re-render by Claude.</p>` : `<p class="note" style="margin:0">Only the words update live. New ads, images and brands need a re-render by Claude.</p>`}
+      <div class="fld" style="justify-content:flex-start"><button class="ib" data-sheetoff>Disconnect</button></div>`,
+    error: `<p class="note" style="margin:0;color:var(--bad)">${esc(SHEET.msg)}</p>
+      <div class="fld" style="justify-content:flex-start">${SHEET_API ? `<button class="ib pri" data-sheetconnect>Choose the folder…</button>` : ""}${SHEET.dir ? `<button class="ib" data-sheetoff>Disconnect</button>` : ""}</div>`,
+  }[SHEET.status];
+  return `<p class="eh" style="margin-top:0">The ad copy</p>
+    <p class="note" style="margin:0">This library’s wording lives in a spreadsheet. Edit it there; images, brands and new ads are set up by Claude.</p>
+    <div class="expf"><a href="ms-excel:ofe|u|${esc(url)}" title="Open in Excel">${esc(sheetPath())}</a><a class="fi" href="ms-excel:ofe|u|${esc(url)}" title="Open in Excel" aria-label="Open ${esc(D.sheet.file)} in Excel">${IC_OPEN}</a><a class="fi" href="${esc(folder)}" target="_blank" rel="noopener" title="Show the folder" aria-label="Show the library folder">${IC_FOLDER}</a></div>
+    <div class="fld" style="justify-content:flex-start"><button class="ib" data-sheetcopy>Copy path</button></div>
+    <p class="eh">In the mockups</p>${state_}`;
+}
+function bindSheet(bar){
+  const q = sel => bar.querySelector(sel);
+  if (q("[data-sheetconnect]")) q("[data-sheetconnect]").onclick = () => sheetConnect();
+  if (q("[data-sheetresume]")) q("[data-sheetresume]").onclick = () => sheetResume();
+  if (q("[data-sheetoff]")) q("[data-sheetoff]").onclick = () => sheetDisconnect();
+  const cp = q("[data-sheetcopy]");
+  if (cp) cp.onclick = async () => { try { await navigator.clipboard.writeText(sheetPath()); cp.textContent = "Copied"; } catch (e) { cp.textContent = sheetPath(); } setTimeout(() => { cp.textContent = "Copy path"; }, 2000); };
+}
 function libCtl(){
   const shared = D.share ? `<span class="fixed" style="cursor:help" title="A single-file copy made ${esc((D.share.created || "").replace("T", " "))}, for review. These are mockups, not live ads.${D.share.videos_as_frames ? " Videos are shown as their cover frame, to judge layout, text and margins." : ""}">Shared copy${D.share.videos_as_frames ? " · videos as still frames" : ""}</span>` : "";
   const title = `<h1>${esc(D.campaign.name || "Ad mockups")}</h1>${shared}`;
@@ -1762,6 +1993,7 @@ function exportView(){
 if (!/^#export/.test(location.hash)) loadPrefs();
 readHash();
 if (state.export) exportView(); else go();
+if (!state.export) sheetInit();
 if ((LIB_ID || (D.share && D.share.library)) && !state.export) {
   const s = document.createElement("script");
   s.src = "../../libraries.js?v=" + Date.now();   // fresh list even if another library was rendered since

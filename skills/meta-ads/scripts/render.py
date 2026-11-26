@@ -210,6 +210,23 @@ def main():
         "placements_version": res["placements_version"],
         "generated": dt.datetime.now().isoformat(timespec="seconds"),
     }
+    # The library's copy lives in ads.xlsx: create it, or give new ads their rows (never overwrites).
+    # Done before data.js, so the viewer knows the sheet is there and when it was saved.
+    sheet_notes = []
+    sp = spec_path.parent / "ads.xlsx"
+    if lib_root and not a.no_sheet:
+        import sheet
+        try:
+            r = sheet.export(spec_path, quiet=True)
+            if r["created"]:
+                sheet_notes += [f"  copy sheet created: {r['path']}",
+                                "    The library's ad copy now lives there: edit it in Excel, then re-render (or connect the viewer to it)."]
+            elif r["added"]:
+                sheet_notes.append(f"  copy sheet: added rows for {', '.join(r['added'])} to {r['path']}")
+        except sheet.SheetError as e:
+            sheet_notes.append(f"  copy sheet not updated: {e}")
+    if lib_root and sp.exists():
+        data["sheet"] = {"file": sp.name, "saved": dt.datetime.fromtimestamp(sp.stat().st_mtime).isoformat(timespec="seconds")}
     write_embeds(out, out_media)
     (out / "data.js").write_text("window.META_ADS = " + json.dumps(data, ensure_ascii=False) + ";\n", encoding="utf-8")
     # Point index.html at this render's data.js with a version stamp, so a browser that cached
@@ -253,18 +270,8 @@ def main():
     print(f"  open: {out / 'index.html'}")
     if lib_root:
         print(f"  library home ({len(libs)} librar{'y' if len(libs) == 1 else 'ies'}): {lib_root / 'index.html'}")
-    if lib_root and not a.no_sheet:
-        # the library's copy lives in ads.xlsx: create it, or give new ads their rows (never overwrites)
-        import sheet
-        try:
-            r = sheet.export(spec_path, quiet=True)
-            if r["created"]:
-                print(f"  copy sheet created: {r['path']}")
-                print("    The library's ad copy now lives there: edit it in Excel, then re-render.")
-            elif r["added"]:
-                print(f"  copy sheet: added rows for {', '.join(r['added'])} to {r['path']}")
-        except sheet.SheetError as e:
-            print(f"  copy sheet not updated: {e}")
+    for line in sheet_notes:
+        print(line)
     if a.open:
         import webbrowser
         webbrowser.open((out / "index.html").as_uri())

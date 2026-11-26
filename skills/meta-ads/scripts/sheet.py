@@ -265,7 +265,11 @@ def apply(spec, spec_path, rep):
                     changed.add(aid)
             else:
                 code = cta_code(v, f"{where}.Button")
-                if code not in (False, None) and code != card.get("cta"):
+                if code == "NO_BUTTON":
+                    if "cta" not in card or card["cta"] not in (None, "NO_BUTTON"):
+                        card["cta"] = None
+                        changed.add(aid)
+                elif code not in (False, None) and code != card.get("cta"):
                     card["cta"] = code
                     changed.add(aid)
     wb.close()
@@ -305,8 +309,14 @@ def _card_rows(ad, cta_labels):
         if not isinstance(c, dict):
             continue
         cta = c.get("cta")
+        if "cta" not in c:
+            label = SAME_AS_AD                 # blank: the ad's button
+        elif cta in (None, "NO_BUTTON"):
+            label = NO_BUTTON                  # this card has none
+        else:
+            label = cta_labels.get(str(cta).upper(), cta)
         out.append({"ad": ad.get("id"), "card": i + 1, "headline": c.get("headline"), "description": c.get("description"),
-                    "cta": SAME_AS_AD if cta is None else (NO_BUTTON if cta == "NO_BUTTON" else cta_labels.get(str(cta).upper(), cta)),
+                    "cta": label,
                     "display_link": c.get("display_link"), "destination_url": c.get("destination_url")})
     return out
 
