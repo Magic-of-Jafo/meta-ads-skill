@@ -47,7 +47,7 @@ The **Export** menu sets the format, which ads (this one, all shown, or your sel
 
 PowerPoint needs python-pptx on your computer, so for that the menu gives you a request to copy and paste to Claude, which makes the file in the library's `exports/` folder. The PDF menu offers the same request, if you'd rather have Claude save it there with an editable deck file. You can also just ask: *"Make a PDF deck of the three hooks in the Spring launch library."*
 
-Simulated mockups are labelled on the slides. Each deck also saves a `.deck.json` file; edit its titles or slide order and ask Claude to rebuild it.
+Simulated mockups are labelled on the slides. A deck Claude makes also saves a `.deck.json` file; edit its titles or slide order and ask Claude to rebuild it.
 
 Team access through a shared folder, with videos playing, is planned: see [`docs/specs/shared-folder-libraries.md`](docs/specs/shared-folder-libraries.md).
 

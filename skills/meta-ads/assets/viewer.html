@@ -1035,7 +1035,7 @@ function exportBody(adsF){
   const left = EXP.fmt === "pdf" ? ads.length - new Set(plan.flatMap(s => s.ad ? [s.ad.id] : (s.items || s.sides.flatMap(sd => sd.items)).map(a => a.id))).size : 0;
   const make = EXP.fmt === "pdf"
     ? `<p class="eh">Save</p>
-    <p class="note" style="margin:0">Opens your browser’s print window with the deck. Choose <b>Save as PDF</b> as the printer. To list it on the libraries page, save it in this library’s exports folder.</p>
+    <p class="note" style="margin:0">Opens your browser’s print window with the deck. Choose <b>Save as PDF</b> as the printer. Save it in this library’s exports folder to have it listed on the libraries page (from the next time the library is rendered).</p>
     ${left ? `<p class="note" style="margin:0">${left} ad${left === 1 ? " doesn’t" : "s don’t"} run in ${EXP.layout === "concept" ? "these placements" : "this placement"}, so ${left === 1 ? "it’s" : "they’re"} left out.</p>` : ""}
     <div class="fld" style="justify-content:flex-start"><button class="ib pri" data-savepdf ${plan.length ? "" : "disabled"}>Save PDF (${plan.length ? plan.length + 2 : 0} slides)…</button></div>
     <p class="note" data-savemsg style="margin:0;overflow-wrap:anywhere" aria-live="polite"></p>
@@ -1045,7 +1045,7 @@ function exportBody(adsF){
     <div class="fld" style="justify-content:flex-start"><button class="ib" data-copy ${req ? "" : "disabled"}>Copy request</button></div></details>`
     : EXP.fmt === "file" && canSave
     ? `<p class="eh">Save</p>
-    <p class="note" style="margin:0">Saves one .html file. Your browser asks where to put it, or puts it in Downloads. To list it on the libraries page, save it in this library’s exports folder.</p>
+    <p class="note" style="margin:0">Saves one .html file. Your browser asks where to put it, or puts it in Downloads. Save it in this library’s exports folder to have it listed on the libraries page (from the next time the library is rendered).</p>
     <div class="fld" style="justify-content:flex-start"><button class="ib pri" data-savefile ${ads.length ? "" : "disabled"}>Save file (${ads.length} ad${ads.length === 1 ? "" : "s"})…</button></div>
     <p class="note" data-savemsg style="margin:0;overflow-wrap:anywhere" aria-live="polite"></p>`
     : `<p class="eh">Ask Claude to make it</p>
