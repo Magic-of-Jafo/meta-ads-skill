@@ -239,6 +239,14 @@ def main():
         lib_id = spec_path.parent.name.replace('"', "")
         html = html.replace('<meta charset="utf-8">', f'<meta charset="utf-8">\n<meta name="meta-ads-library" content="{lib_id}">', 1)
     (out / "index.html").write_text(html, encoding="utf-8", newline="")
+    # third-party files the viewer loads on demand (the emoji picker); see assets/vendor/README.md
+    vdir = out / "vendor"
+    vdir.mkdir(exist_ok=True)
+    for f in (metaads.SKILL_DIR / "assets" / "vendor").iterdir():
+        if f.is_file() and f.suffix in (".js", ".txt"):
+            dest = vdir / f.name
+            if not dest.exists() or dest.stat().st_mtime < f.stat().st_mtime or dest.stat().st_size != f.stat().st_size:
+                shutil.copy2(f, dest)
     # Self-contained snapshot: same spec, media paths pointing at the stored copies, so the
     # output folder can be re-rendered or moved. The agent's working ads.json is never touched.
     snap = json.loads(json.dumps(spec))

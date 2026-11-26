@@ -57,6 +57,9 @@ After you reload the page, **Copy** → **Load the latest copy** reconnects with
 1. Click **✎ Edit copy** at the top and allow saving to the folder (once per session; if the viewer isn't connected yet, it asks for the folder as above).
 2. Click any text in a mockup: the primary text, headline, description or button. A panel opens on the right with that ad and that field ready.
 3. Type. That ad's mockups update as you pause, and the sheet is saved a second later: the panel says **Saved to ads.xlsx at …**. Use **‹ ›** to step through ads, **Undo** to take back the last change, and **Done** to finish.
+4. For an emoji, click **😊** beside a field's character count. Pick from the categories or search ("wine" finds 🍷); your most recently used ones are at the top. Each pick goes in where your cursor is, and the picker stays open for more; Escape closes it.
+
+In Feed preview and All placements the panel edits the ad on show, so the Ad picker and arrows choose it; in Compare ads, click the ad's mockup.
 
 Only the cells you edit change; your formatting, dropdowns and own columns stay as they are. Before the first save of each session, a copy of the sheet goes to the library's `backups/` folder.
 
@@ -160,6 +163,7 @@ Everything runs locally on your machine. The plugin has no hooks, no MCP servers
   - `share.py` writes a single-file copy of a viewer (images embedded, videos as cover frames) into the library's `exports/` folder. The viewer's **Save file** makes the same file in the browser, from scaled copies of the images that `render.py` writes to `viewer/embed/`. Neither sends anything; you decide where the file goes.
   - `deck.py` makes PDF and PowerPoint decks in the same `exports/` folder. It screenshots the mockups with headless Chrome or Edge, has the browser print the slides to PDF, and writes the `.pptx` with python-pptx. Working images go in `exports/.build/`.
   - `sheet.py` writes a library's copy to `ads.xlsx` beside its `ads.json`. Afterwards it only adds rows for new ads; rebuilding it (`--fresh`) first copies the old sheet to `backups/`. `check.py` and `render.py` read the sheet when it's there.
+  - The viewer's emoji picker is [emoji-mart](https://github.com/missive/emoji-mart) (MIT), bundled in `skills/meta-ads/assets/vendor/` with its license and copied into each viewer, so it works offline; it loads only when you open it.
   - `library.py` creates library folders under `meta-ads/` and rewrites that folder's `index.html` and `libraries.js`. It deletes nothing.
   - `export_png.py` saves PNGs into that folder's `png/` subfolder.
   - `sync_spec.py` is a maintenance script that regenerates tables in the docs.

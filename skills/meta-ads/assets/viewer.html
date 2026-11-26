@@ -92,7 +92,11 @@ body.editing #main{margin-right:min(400px,100vw)}
 #edpanel .edh,#edpanel .ednav,#edpanel .edrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
 #edpanel .edh .rhs{display:flex;gap:6px}
 #edpanel .ednav span{flex:1;text-align:center;overflow-wrap:anywhere}
-#edpanel label{display:flex;flex-direction:column;gap:4px;font-weight:600}
+#edpanel .edf{display:flex;flex-direction:column;gap:4px;font-weight:600}
+#edpanel .edtools{display:inline-flex;align-items:center;gap:6px}
+#edpanel .edemo{font:inherit;font-size:15px;line-height:1;width:26px;height:24px;padding:0;border:1px solid var(--ui-line);border-radius:6px;background:var(--ui-bg);cursor:pointer;filter:grayscale(.35)}
+#edpanel .edemo:hover,#edpanel .edemo:focus-visible{filter:none;border-color:var(--ui-accent)}
+#edemoji{position:fixed;z-index:90;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
 #edpanel input,#edpanel textarea,#edpanel select{font:inherit;font-weight:400;font-size:13px;line-height:1.4;padding:6px 8px;border:1px solid var(--ui-line);border-radius:6px;background:var(--ui-bg);color:var(--ui-text);width:100%}
 #edpanel textarea{resize:vertical}
 #edpanel input:focus,#edpanel textarea:focus,#edpanel select:focus{outline:2px solid var(--ui-accent);outline-offset:0;border-color:transparent}
@@ -1975,6 +1979,7 @@ function edValue(ad, f, card){   // what the panel shows for a field
   return ad[f] || "";
 }
 function renderPanel(){
+  if (EMO.wrap && !EMO.wrap.hidden && EMO.target && EMO.target.id !== EDIT.id) emojiClose();
   let el = $("#edpanel");
   if (!EDIT.on) { if (el) el.remove(); document.body.classList.remove("editing"); return; }
   if (!el) { el = document.createElement("aside"); el.id = "edpanel"; el.setAttribute("aria-label", "Edit the ad copy"); document.body.appendChild(el); bindPanel(el); }
@@ -1985,11 +1990,12 @@ function renderPanel(){
   if (!ad) { el.innerHTML = `${head}${status}<p class="note" style="margin:0">Click any text in a mockup (the primary text, headline, description or button) to edit that ad here.</p>`; return; }
   const list = filteredAds(), i = list.findIndex(a => a.id === ad.id);
   const field = (f, label, kind, card) => {
-    const v = edValue(ad, f, card), cd = card != null ? ` data-card="${card}"` : "";
-    const ctl = kind === "select" ? `<select data-ef="${f}"${cd}>${ctaOptions(v, card != null)}</select>`
-      : kind === "area" || kind === "note" ? `<textarea data-ef="${f}"${cd} rows="${kind === "area" ? 6 : 2}">${esc(v)}</textarea>`
-      : `<input data-ef="${f}"${cd} value="${esc(v)}">`;
-    return `<label><span class="edrow"><span>${label}</span>${kind === "select" ? "" : edCount(f, v)}</span>${ctl}</label>`;
+    const v = edValue(ad, f, card), cd = card != null ? ` data-card="${card}"` : "", al = ` aria-label="${esc(label)}${card != null ? `, card ${card + 1}` : ""}"`;
+    const ctl = kind === "select" ? `<select data-ef="${f}"${cd}${al}>${ctaOptions(v, card != null)}</select>`
+      : kind === "area" || kind === "note" ? `<textarea data-ef="${f}"${cd}${al} rows="${kind === "area" ? 6 : 2}">${esc(v)}</textarea>`
+      : `<input data-ef="${f}"${cd}${al} value="${esc(v)}">`;
+    const emo = EMOJI_FIELDS.includes(f) ? `<button type="button" class="edemo" data-emoji title="Insert an emoji" aria-label="Insert an emoji in ${esc(label)}">😊</button>` : "";
+    return `<div class="edf"><span class="edrow"><span>${label}</span><span class="edtools">${emo}${kind === "select" ? "" : edCount(f, v)}</span></span>${ctl}</div>`;
   };
   const cards = ad.format === "carousel" ? (ad.cards || []).map((c, k) => `<fieldset><legend>Card ${k + 1}</legend>${field("headline", "Headline", "input", k)}${field("description", "Description", "input", k)}${field("cta", "Button", "select", k)}</fieldset>`).join("") : "";
   el.innerHTML = `${head}${status}
@@ -1997,6 +2003,86 @@ function renderPanel(){
     ${ED_FIELDS.filter(([f]) => !(ad.format === "carousel" && (f === "headline" || f === "description"))).map(([f, l, k]) => field(f, l, k)).join("")}
     ${cards}
     <p class="note" style="margin:0">The length counts show where Facebook Feed cuts the text. Images, brands and new ads are set up by Claude.</p>`;
+}
+/* Emoji picker: emoji-mart (MIT), bundled in vendor/ and loaded on first use. Its "Frequently used"
+   row, remembered by emoji-mart in this browser, sits at the top. A pick goes in at the cursor (or at
+   the end if the field wasn't active), through the same path as typing, and is one Undo step. */
+const EMOJI_FIELDS = ["label", "primary_text", "headline", "description", "notes"];
+const EMO = {el: null, theme: null, wrap: null, target: null, loading: null};
+async function emojiLoad(){
+  if (window.EmojiMart && window.EMOJI_MART_DATA) return;
+  EMO.loading = EMO.loading || Promise.all([loadScript("vendor/emoji-mart.js"), loadScript("vendor/emoji-mart-data.js")]);
+  try { await EMO.loading; } catch (e) { EMO.loading = null; throw e; }
+}
+function emojiClose(){
+  if (!EMO.wrap || EMO.wrap.hidden) return;
+  EMO.wrap.hidden = true;
+  const t = EMO.target;
+  if (t && t.el && t.el.isConnected) { t.el.focus(); t.el.setSelectionRange(t.start, t.end); }
+  EMO.target = null;
+}
+function emojiInsert(native){
+  const t = EMO.target;
+  if (!t) return;
+  let el = t.el;
+  if (!el || !el.isConnected) {   // the panel was redrawn: find the same field again
+    if (EDIT.id !== t.id) return emojiClose();
+    el = $("#edpanel").querySelector(`[data-ef="${t.f}"]${t.card != null ? `[data-card="${t.card}"]` : ":not([data-card])"}`);
+    if (!el) return emojiClose();
+    t.el = el;
+  }
+  const old = el.value, start = Math.min(t.start, old.length), end = Math.min(t.end, old.length);
+  el.value = old.slice(0, start) + native + old.slice(end);
+  t.start = t.end = start + native.length;
+  EDIT.undo.push({id: t.id, f: t.f, card: t.card, v: old, after: el.value});
+  el.dispatchEvent(new Event("input", {bubbles: true}));   // mockups, count and saving, as for typing
+  const u = $("#edpanel [data-edundo]"); if (u) u.disabled = false;
+}
+/* emoji-mart orders "Frequently used" by count, after its own starter set; like a phone keyboard, put
+   the latest pick first instead. Its counts live in memory and are saved after each pick, so raise
+   this one through its own API until it's above every other. */
+function emojiRecent(id){
+  try {
+    const FU = EmojiMart.FrequentlyUsed, m = EmojiMart.Store.get("frequently") || {};
+    const counts = Object.values(m).map(Number).filter(Number.isFinite), max = counts.length ? Math.max(...counts) : 0;
+    const others = Object.entries(m).some(([k, v]) => k !== id && +v === max);
+    for (let n = (m[id] || 0); n < max || (n === max && others); n++) FU.add({id});
+  } catch (e) { /* storage blocked: the row keeps emoji-mart's order */ }
+}
+async function emojiOpen(btn){
+  const box = btn.closest(".edf"), el = box && box.querySelector("[data-ef]");
+  if (!el) return;
+  if (EMO.wrap && !EMO.wrap.hidden && EMO.target && EMO.target.el === el) return emojiClose();   // the button toggles
+  const active = document.activeElement === el;
+  EMO.target = {el, id: EDIT.id, f: el.dataset.ef, card: el.dataset.card != null ? +el.dataset.card : null,
+    start: active ? el.selectionStart : el.value.length, end: active ? el.selectionEnd : el.value.length};
+  try { await emojiLoad(); }
+  catch (e) { edStatus("The emoji picker isn’t in this viewer yet. Ask Claude to re-render the library.", "warn"); EMO.target = null; return; }
+  const theme = state.dark ? "dark" : "light";
+  if (!EMO.wrap) {
+    EMO.wrap = document.createElement("div"); EMO.wrap.id = "edemoji"; EMO.wrap.hidden = true;
+    document.body.appendChild(EMO.wrap);
+  }
+  {   // a fresh picker each time, so the Frequently used row is current
+    EMO.wrap.replaceChildren();
+    EMO.el = new EmojiMart.Picker({
+      data: window.EMOJI_MART_DATA, theme, previewPosition: "none", skinTonePosition: "search", navPosition: "top",
+      perLine: 8, emojiButtonSize: 34, emojiSize: 22, maxFrequentRows: 2, autoFocus: true,
+      onEmojiSelect: e => { emojiInsert(e.native); setTimeout(() => emojiRecent(e.id), 0); },
+      onClickOutside: e => { if (!e || !(e.target && e.target.closest && e.target.closest("[data-emoji]"))) emojiClose(); },
+    });
+    EMO.theme = theme;
+    EMO.wrap.appendChild(EMO.el);
+  }
+  EMO.wrap.hidden = false;
+  const q = EMO.el.shadowRoot && EMO.el.shadowRoot.querySelector("input");   // open clean: no leftover search
+  if (q && q.value) { q.value = ""; q.dispatchEvent(new Event("input", {bubbles: true, composed: true})); }
+  // left of the panel, level with the button, so the text stays in view; on a narrow window, below or above it
+  const r = btn.getBoundingClientRect(), pr = $("#edpanel").getBoundingClientRect(), w = EMO.wrap.offsetWidth || 320, h = EMO.wrap.offsetHeight || 420;
+  let left, top;
+  if (pr.left - w - 12 >= 8) { left = pr.left - w - 12; top = Math.max(8, Math.min(innerHeight - h - 8, r.top - 12)); }
+  else { left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)); top = r.bottom + 6 + h <= innerHeight - 8 ? r.bottom + 6 : Math.max(8, r.top - 6 - h); }
+  Object.assign(EMO.wrap.style, {left: left + "px", top: top + "px"});
 }
 function edOpen(id, f, card){
   EDIT.id = id;
@@ -2068,14 +2154,16 @@ function bindPanel(el){
     const t = e.target.closest("[data-ef]");
     if (!t) return;
     edApply(EDIT.id, t.dataset.ef, t.dataset.card != null ? +t.dataset.card : null, t.value);
-    const c = t.closest("label") && t.closest("label").querySelector("[data-cnt]");
+    const c = t.closest(".edf") && t.closest(".edf").querySelector("[data-cnt]");
     if (c) { const n = [...t.value].length, L = edLimits()[t.dataset.ef]; c.textContent = L ? `${n} / ${L}` : String(n); c.classList.toggle("over", !!(L && n > L)); }
   });
   el.addEventListener("change", e => { const t = e.target.closest("select[data-ef]"); if (t) t.blur(); });   // a choice is a whole change: ready for Undo
+  el.addEventListener("mousedown", e => { if (e.target.closest("[data-emoji]")) e.preventDefault(); });   // the field keeps its cursor
   el.addEventListener("click", e => {
     const b = e.target.closest("button");
     if (!b) return;
-    if (b.matches("[data-edclose]")) edStop();
+    if (b.matches("[data-emoji]")) emojiOpen(b);
+    else if (b.matches("[data-edclose]")) { emojiClose(); edStop(); }
     else if (b.matches("[data-edundo]")) {
       const u = EDIT.undo.pop();
       if (!u) return;
@@ -2330,7 +2418,7 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("keydown", e => {
   if (state.export || e.altKey || e.ctrlKey || e.metaKey) return;
-  if (e.key === "Escape") { document.querySelectorAll("#bar details.menu[open]").forEach(d => d.open = false); return; }
+  if (e.key === "Escape") { if (EMO.wrap && !EMO.wrap.hidden) { emojiClose(); return; } document.querySelectorAll("#bar details.menu[open]").forEach(d => d.open = false); return; }
   if (e.target.closest("input, select, textarea")) return;
   if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
   const d = e.key === "ArrowLeft" ? -1 : 1;
