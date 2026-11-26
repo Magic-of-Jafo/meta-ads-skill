@@ -1838,13 +1838,11 @@ function applySheet(tabs){
       if ("cta" in r) { const k = code(r.cta); c.cta = r.cta == null ? a.cta : k === "NO_BUTTON" ? null : k === false ? c.cta : k; }
     } else if ((BASE_COPY[a.id].cards[i] || {}).cta === BASE_COPY[a.id].cta) c.cta = a.cta;   // follows the ad's button
   });
-  let changed = 0;
-  for (const a of D.ads) {
-    const b = BASE_COPY[a.id];
-    if (COPY_FIELDS.some(f => (a[f] ?? "") !== (b[f] ?? "")) || (a.cards || []).some((c, i) => CARD_COPY.some(f => (c[f] ?? "") !== ((b.cards[i] || {})[f] ?? "")))) changed++;
-    for (const [pl, cell] of Object.entries(D.matrix[a.id] || {})) if (cell && P[pl] && "copy" in cell) cell.copy = copyChecks(a, P[pl]);
-  }
-  return {changed, unknown};
+  for (const a of D.ads) for (const [pl, cell] of Object.entries(D.matrix[a.id] || {})) if (cell && P[pl] && "copy" in cell) cell.copy = copyChecks(a, P[pl]);
+  return {changed: countChanged(), unknown};
+}
+function countChanged(){   // ads whose copy differs from the last render
+  return D.ads.filter(a => { const b = BASE_COPY[a.id]; return COPY_FIELDS.some(f => (a[f] ?? "") !== (b[f] ?? "")) || (a.cards || []).some((c, i) => CARD_COPY.some(f => (c[f] ?? "") !== ((b.cards[i] || {})[f] ?? ""))); }).length;
 }
 async function sheetLoad(force){
   if (!force && (EDIT.pending.size || EDIT.saving)) return;   // our own unsaved edits win; the save re-reads the file
@@ -1890,6 +1888,7 @@ async function sheetResume(){   // after a reload: the browser may need a click 
   if (SHEET.status === "live") startSheetPoll();
 }
 async function sheetDisconnect(){
+  if (EDIT.on) await edStop();   // save what's typed, then stop editing: there's no folder to save to after this
   stopSheetPoll();
   try { await idbDel("lib:" + LIB_ID); } catch (e) {}
   SHEET.dir = null;
@@ -2023,6 +2022,7 @@ async function edSave(){
     for (const [k, p] of batch) if (EDIT.pending.get(k) === p) EDIT.pending.delete(k);
     if (r.missing.length) edStatus(`Saved, except ${r.missing.length} field${r.missing.length === 1 ? "" : "s"} with no row or column in the sheet (${esc(r.missing.map(p => p.id).join(", "))}). Ask Claude to re-render to add them.`, "warn");
     else edStatus(`Saved to ${D.sheet.file} at ${fmtTime(SHEET.saved)}.`, "");
+    SHEET.changed = countChanged();   // so the Copy menu and export requests know the sheet moved on
     toolbar();
   } catch (e) {
     const name = e && e.name, m = String(e && e.message || e);
