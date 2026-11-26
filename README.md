@@ -43,7 +43,9 @@ The **Export** menu sets the format, which ads (this one, all shown, or your sel
   - **Brand vs brand:** two brands facing each other in one placement, for example your ads against a competitor's.
 - **PowerPoint:** the same deck as an editable `.pptx`, with the full ad text in the speaker notes. It needs the [python-pptx](https://python-pptx.readthedocs.io/en/latest/user/install.html) library.
 
-PDF and PowerPoint need headless Chrome and python-pptx on your computer, so for those the menu gives you a request to copy and paste to Claude, which makes the file in the library's `exports/` folder. You can also just ask: *"Make a PDF deck of the three hooks in the Spring launch library."*
+**Save PDF** builds the deck in the viewer and opens your browser's print window: choose **Save as PDF** as the printer. The mockups go in as live pages rather than screenshots, so they stay sharp at any zoom.
+
+PowerPoint needs python-pptx on your computer, so for that the menu gives you a request to copy and paste to Claude, which makes the file in the library's `exports/` folder. The PDF menu offers the same request, if you'd rather have Claude save it there with an editable deck file. You can also just ask: *"Make a PDF deck of the three hooks in the Spring launch library."*
 
 Simulated mockups are labelled on the slides. Each deck also saves a `.deck.json` file; edit its titles or slide order and ask Claude to rebuild it.
 
