@@ -41,11 +41,13 @@ The **Export** menu sets the format, which ads (this one, all shown, or your sel
   - **One slide per ad:** the ad in up to three placements, with its headline, text and button as real text.
   - **Side by side:** up to four ads in one placement.
   - **Brand vs brand:** two brands facing each other in one placement, for example your ads against a competitor's.
-- **PowerPoint:** the same deck as an editable `.pptx`, with the full ad text in the speaker notes. It needs the [python-pptx](https://python-pptx.readthedocs.io/en/latest/user/install.html) library.
+- **PowerPoint:** the same deck as an editable `.pptx`. The text stays text, the mockups are pictures, and the full ad text is in the speaker notes.
 
 **Save PDF** builds the deck in the viewer and opens your browser's print window: choose **Save as PDF** as the printer. The mockups go in as live pages rather than screenshots, so they stay sharp at any zoom.
 
-PowerPoint needs python-pptx on your computer, so for that the menu gives you a request to copy and paste to Claude, which makes the file in the library's `exports/` folder. The PDF menu offers the same request, if you'd rather have Claude save it there with an editable deck file. You can also just ask: *"Make a PDF deck of the three hooks in the Spring launch library."*
+**Save PowerPoint** builds the `.pptx` in the viewer and asks where to save it. Nothing needs installing.
+
+Both menus also offer a request to copy and paste to Claude, if you'd rather have Claude save the deck in the library's `exports/` folder with an editable deck file. You can also just ask: *"Make a PDF deck of the three hooks in the Spring launch library."*
 
 Simulated mockups are labelled on the slides. A deck Claude makes also saves a `.deck.json` file; edit its titles or slide order and ask Claude to rebuild it.
 
@@ -105,7 +107,7 @@ Use one option, not both, or you'll have two copies of the skill.
 - **[Python](https://www.python.org/downloads/) 3.9+** with **[Pillow](https://pillow.readthedocs.io/en/stable/installation/basic-installation.html)**
 - **[ffmpeg / ffprobe](https://ffmpeg.org/download.html)** on your PATH, for video ads (measuring and cover frames)
 - **Chrome or Edge**, for PNG and PDF export. If it isn't found automatically, give its path with `--browser`.
-- **[python-pptx](https://python-pptx.readthedocs.io/en/latest/user/install.html)**, only for PowerPoint export
+- **[python-pptx](https://python-pptx.readthedocs.io/en/latest/user/install.html)**, only for PowerPoint decks Claude makes (the viewer's Save PowerPoint doesn't need it)
 
 ## What it runs, sends and fetches
 
