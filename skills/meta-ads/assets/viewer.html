@@ -1757,9 +1757,15 @@ async function sheetLoad(force){
 }
 function startSheetPoll(){ stopSheetPoll(); SHEET.timer = setInterval(() => { if (!document.hidden && SHEET.status === "live") sheetLoad(false); }, 2000); }
 function stopSheetPoll(){ if (SHEET.timer) clearInterval(SHEET.timer); SHEET.timer = null; }
+const libPath = () => { const p = libFolder().replace(/\/viewer$/, ""); return /^[A-Za-z]:\//.test(p) ? p.replace(/\//g, "\\") : p; };
 async function sheetConnect(){
+  // A page can't open a folder by its path, so the user picks it. Make that quick: the path goes on the
+  // clipboard to paste into the dialog's address bar, and the dialog remembers this library's folder
+  // (one picker id per library) so next time it opens right there.
+  navigator.clipboard.writeText(libPath()).catch(() => {});
+  let h = 0; for (const ch of LIB_ID) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   let dir;
-  try { dir = await showDirectoryPicker({id: "metaads", mode: "read"}); }
+  try { dir = await showDirectoryPicker({id: "metaads-" + h.toString(36), mode: "read"}); }
   catch (e) { if (e && e.name === "AbortError") return; SHEET.status = "error"; SHEET.msg = "The browser didn’t allow it: " + (e && e.message || e); toolbar(); return; }
   if (dir.name !== LIB_ID) {
     SHEET.status = "error";
@@ -1807,7 +1813,7 @@ function sheetBody(){
   const state_ = {
     off: `<p class="note" style="margin:0">The mockups show the copy as it was when the library was rendered (sheet saved ${esc(rendered)}). Connect the viewer to the sheet to see your edits as soon as you save them in Excel, without asking Claude to re-render.</p>
       ${SHEET_API ? `<div class="fld" style="justify-content:flex-start"><button class="ib pri" data-sheetconnect>Connect to ${esc(D.sheet.file)}…</button></div>
-      <p class="note" style="margin:0">Your browser asks you to choose a folder: choose this library’s folder, <b>${esc(LIB_ID)}</b> (the one with ${esc(D.sheet.file)} in it), and allow reading it. You do this once per browser session.</p>` : `<p class="note" style="margin:0">This browser can’t read files from a page. Chrome and Edge can; or ask Claude to re-render after you save.</p>`}`,
+      <p class="note" style="margin:0">Your browser asks you to choose this library’s folder, <b>${esc(LIB_ID)}</b>. Its path is copied for you: paste it (Ctrl+V) into the dialog’s address bar, press Enter, then <b>Select Folder</b> and allow reading. A web page can’t open a folder on its own, so this is the one step you do; after a reload it’s a single click.</p>` : `<p class="note" style="margin:0">This browser can’t read files from a page. Chrome and Edge can; or ask Claude to re-render after you save.</p>`}`,
     click: `<p class="note" style="margin:0">The viewer is connected to the sheet, but the browser needs a click to read it again after a reload.</p>
       <div class="fld" style="justify-content:flex-start"><button class="ib pri" data-sheetresume>Load the latest copy</button><button class="ib" data-sheetoff>Disconnect</button></div>`,
     live: `<p class="note" style="margin:0"><b>Live.</b> Showing the sheet as saved ${esc(fmtTime(SHEET.saved))}${SHEET.changed ? `: ${SHEET.changed} ad${SHEET.changed === 1 ? " differs" : "s differ"} from the last render` : ", the same as the last render"}. Save in Excel and the mockups update within a few seconds.</p>
