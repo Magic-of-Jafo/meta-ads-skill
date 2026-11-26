@@ -61,7 +61,7 @@ details.menu[open] > summary{border-color:var(--ui-accent)}
 .pop .exppls select{flex:1 1 30%;min-width:0;max-width:none}
 .pop .expin{font:inherit;font-size:12px;padding:5px 7px;border:1px solid var(--ui-line);border-radius:6px;background:var(--ui-bg);color:var(--ui-text);width:100%;resize:vertical}
 .pop a.expf{color:var(--ui-accent);font-size:12px;overflow-wrap:anywhere}
-.pop{max-height:calc(100vh - 120px);overflow:auto}
+.pop{max-height:calc(100vh - 120px);overflow-y:auto;overflow-x:hidden}
 .selbar{background:color-mix(in srgb,var(--ui-accent) 10%,var(--ui-panel));border:1px solid color-mix(in srgb,var(--ui-accent) 40%,var(--ui-line));border-radius:8px;padding:6px 10px}
 .selbar b{font-size:13px}
 .ib.pri{background:var(--ui-accent);border-color:var(--ui-accent);color:#fff}
@@ -1031,7 +1031,8 @@ function exportBody(adsF){
   const make = EXP.fmt === "file" && canSave
     ? `<p class="eh">Save</p>
     <p class="note" style="margin:0">Saves one .html file. Your browser asks where to put it, or puts it in Downloads. To list it on the libraries page, save it in this library’s exports folder.</p>
-    <div class="fld" style="justify-content:flex-start"><button class="ib pri" data-savefile ${ads.length ? "" : "disabled"}>Save file (${ads.length} ad${ads.length === 1 ? "" : "s"})…</button><span class="cnt" data-savemsg></span></div>`
+    <div class="fld" style="justify-content:flex-start"><button class="ib pri" data-savefile ${ads.length ? "" : "disabled"}>Save file (${ads.length} ad${ads.length === 1 ? "" : "s"})…</button></div>
+    <p class="note" data-savemsg style="margin:0;overflow-wrap:anywhere" aria-live="polite"></p>`
     : `<p class="eh">Ask Claude to make it</p>
     <p class="note" style="margin:0">${EXP.fmt === "file" ? "This library was rendered by an older version of the skill, so it can’t save the file itself. Paste this request to Claude, or ask Claude to re-render the library." : "PDF and PowerPoint need Chrome’s screenshots and PowerPoint tools, which run on your computer through Claude. Copy this request and paste it to Claude; the file goes to this library’s exports folder."}</p>
     <textarea data-expreq class="expin" readonly rows="4" placeholder="Pick at least one ad.">${esc(EXP.fmt === "file" ? expRequest(adsF) : req)}</textarea>
