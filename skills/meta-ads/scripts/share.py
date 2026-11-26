@@ -15,7 +15,7 @@ shared drive. Nothing is uploaded.
 - --ads limits the copy to some ads; media no remaining ad or brand uses is left out.
 - The copy has no Library menu and asks search engines not to index it.
 
-Default output: <library>/share/<name>-<date>.html for a library, else <VIEWER_DIR>/share/.
+Default output: <library>/exports/<name>-<date>.html for a library, else <VIEWER_DIR>/exports/.
 """
 import argparse
 import base64
@@ -126,7 +126,7 @@ def main():
                     m.pop(k, None)
     in_library = src.name == "viewer" and (src.parent / "ads.json").exists()
     # The library's folder name lets the copy link back to the library and home page when it's opened
-    # where it was made (<library>/share/). Sent elsewhere, those files don't exist and no links show.
+    # where it was made (<library>/exports/). Sent elsewhere, those files don't exist and no links show.
     data["share"] = {"created": dt.datetime.now().isoformat(timespec="minutes"), "videos_as_frames": videos,
                      "library": src.parent.name if in_library else None}
 
@@ -146,7 +146,7 @@ def main():
         out = Path(a.out).resolve()
     else:
         base = src.parent if (src.name == "viewer" and (src.parent / "ads.json").exists()) else src
-        out = base / "share" / f"{name}-{dt.date.today().isoformat()}.html"
+        out = base / "exports" / f"{name}-{dt.date.today().isoformat()}.html"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8", newline="")
     mb = out.stat().st_size / 1e6

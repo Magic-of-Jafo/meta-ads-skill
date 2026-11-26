@@ -60,8 +60,9 @@ function card(l){
   const stats = l.rendered
     ? `<span>${plural(l.ads || 0, "ad")}</span><span><span class="dot actual"></span>${c.actual || 0} actual</span><span><span class="dot simulated"></span>${c.simulated || 0} simulated</span><span>Updated ${esc(when(l.updated))}</span>`
     : `<span>${l.has_spec ? plural(l.ads || 0, "ad") + ", not rendered yet. Ask your agent to render it." : "Empty. Ask your agent to add ads to it."}</span>`;
-  const shares = (l.shares || []).slice(0, 3).map(f => `<a href="${encodeURIComponent(l.id)}/share/${encodeURIComponent(f)}">${esc(f)}</a>`).join("");
-  const inner = `${thumb}<div class="body"><p class="name">${esc(l.name)}</p>${l.notes ? `<p class="notes">${esc(l.notes)}</p>` : ""}${brands}<div class="stats">${stats}</div>${l.rendered ? `<a class="open" href="${encodeURIComponent(l.id)}/viewer/index.html">Open library →</a>` : ""}${shares ? `<div class="shares"><span>Share files to send:</span>${shares}</div>` : ""}</div>`;
+  const files = l.exports || (l.shares || []).map(f => "share/" + f);
+  const shares = files.slice(0, 4).map(f => `<a href="${encodeURIComponent(l.id)}/${f.split("/").map(encodeURIComponent).join("/")}">${esc(f.split("/").pop())}</a>`).join("");
+  const inner = `${thumb}<div class="body"><p class="name">${esc(l.name)}</p>${l.notes ? `<p class="notes">${esc(l.notes)}</p>` : ""}${brands}<div class="stats">${stats}</div>${l.rendered ? `<a class="open" href="${encodeURIComponent(l.id)}/viewer/index.html">Open library →</a>` : ""}${shares ? `<div class="shares"><span>Exported files:</span>${shares}</div>` : ""}</div>`;
   return `<div class="card">${inner}</div>`;
 }
 document.getElementById("main").innerHTML = L.length

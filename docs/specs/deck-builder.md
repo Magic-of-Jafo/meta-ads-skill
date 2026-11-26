@@ -1,6 +1,14 @@
 # Spec: deck builder (PDF and PowerPoint)
 
-Status: proposed. Next feature after the single-file share (v1.4.0).
+Status: partly built.
+
+- **Shipped in v1.5.0:** `deck.py` (`quick` and `build`), with the `concept`, `lineup` and `versus` layouts, a cover and a closing slide, as PDF and PowerPoint. It's driven from the viewer's **Export** menu: pick the format, the ads and the layout, then paste the request to Claude.
+- **Still planned (below):**
+  - the visual builder page (slide rail, drag to reorder, decks across libraries from the UI);
+  - the `section`, `everywhere` and `takeaways` layouts;
+  - a theme logo;
+  - embedded video in PowerPoint;
+  - the `started` date field.
 
 ## Goal
 

@@ -30,14 +30,18 @@ Keep separate sets of ads apart: your drafts, each competitor, each campaign. Ev
 
 Ask for it in plain words: *"Start a mockup library called Acme competitors with their current ads"*, *"Add these two drafts to my Spring launch library"*. The agent creates and fills the folders, following the layout in [`SKILL.md`](skills/meta-ads/SKILL.md#libraries).
 
-## Share mockups
+## Export: a file to send, a PDF or a PowerPoint
 
-To show the mockups to someone, ask for a **single-file share**: *"Make a shareable file of the Spring launch library"*. You get one `.html` file with everything inside it. Send it by email, Slack or Teams, or drop it in a shared drive. The recipient downloads it and double-clicks it: no install, no account, and nothing is uploaded anywhere.
+The viewer's **Export** menu (top right) sets up what to export: the format, which ads (this one, all shown, or ones you pick) and, for slides, the layout. It then gives you a request to copy and paste to Claude, which makes the file in the library's `exports/` folder. The page itself can't create files. You can also just ask: *"Make a PDF deck of the three hooks in the Spring launch library."*
 
-- Videos appear as their cover frame. The share is for judging how each ad looks on the device (text against image, margins, safe areas), and it keeps the file small.
-- You can share only some ads. Images are scaled to phone-mockup size unless you ask for full resolution.
-- Open the file in the browser, not in a web preview such as Google Drive's, which won't run it.
-- Opened where it was made (the library's `share/` folder), it links back to the full library and to all libraries. A copy you send shows no links.
+- **File (.html):** one file with every mockup inside it. Send it by email, Slack or Teams. The recipient downloads it and double-clicks it: no install, no account, nothing uploaded. Videos appear as their cover frame, and images are scaled to phone-mockup size. Open it in a browser, not in a web preview such as Google Drive's. Opened where it was made, it links back to the library.
+- **PDF:** a designed 16:9 deck. A cover, then your slides, then a closing note on what the mockups are. Slide layouts:
+  - **One slide per ad:** the ad in up to three placements, with its headline, text and button as real text.
+  - **Side by side:** up to four ads in one placement.
+  - **Brand vs brand:** two brands facing each other in one placement, for example your ads against a competitor's.
+- **PowerPoint:** the same deck as an editable `.pptx`, with the full ad text in the speaker notes. It needs the [python-pptx](https://python-pptx.readthedocs.io/en/latest/user/install.html) library.
+
+Simulated mockups are labelled on the slides. Each deck also saves a `.deck.json` file; edit its titles or slide order and ask Claude to rebuild it.
 
 Team access through a shared folder, with videos playing, is planned: see [`docs/specs/shared-folder-libraries.md`](docs/specs/shared-folder-libraries.md).
 
@@ -94,7 +98,8 @@ Use one option, not both, or you'll have two copies of the skill.
 
 - **[Python](https://www.python.org/downloads/) 3.9+** with **[Pillow](https://pillow.readthedocs.io/en/stable/installation/basic-installation.html)**
 - **[ffmpeg / ffprobe](https://ffmpeg.org/download.html)** on your PATH, for video ads (measuring and cover frames)
-- **Chrome or Edge**, for PNG export. If it isn't found automatically, give its path with `--browser`.
+- **Chrome or Edge**, for PNG and PDF export. If it isn't found automatically, give its path with `--browser`.
+- **[python-pptx](https://python-pptx.readthedocs.io/en/latest/user/install.html)**, only for PowerPoint export
 
 ## What it runs, sends and fetches
 
@@ -103,7 +108,8 @@ Everything runs locally on your machine. The plugin has no hooks, no MCP servers
 - **Python scripts** in `skills/meta-ads/scripts/`, which Claude runs when you ask for mockups:
   - `check.py` validates your `ads.json` and writes `inventory.json` and `inventory.md` next to it.
   - `render.py` copies your media into the output folder (a library's `viewer/`, or `meta-ads-output/<campaign>-<date>/` in the current folder) and writes the viewer (`index.html`, `data.js`) there. For a library it also rewrites `index.html` and `libraries.js` in the library root (`meta-ads/`).
-  - `share.py` writes a single-file copy of a viewer (images embedded, videos as cover frames) into a `share/` folder. It sends nothing; you decide where the file goes.
+  - `share.py` writes a single-file copy of a viewer (images embedded, videos as cover frames) into the library's `exports/` folder. It sends nothing; you decide where the file goes.
+  - `deck.py` makes PDF and PowerPoint decks in the same `exports/` folder. It screenshots the mockups with headless Chrome or Edge, has the browser print the slides to PDF, and writes the `.pptx` with python-pptx. Working images go in `exports/.build/`.
   - `library.py` creates library folders under `meta-ads/` and rewrites that folder's `index.html` and `libraries.js`. It deletes nothing.
   - `export_png.py` saves PNGs into that folder's `png/` subfolder.
   - `sync_spec.py` is a maintenance script that regenerates tables in the docs.
