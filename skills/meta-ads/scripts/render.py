@@ -28,6 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import metaads  # noqa: E402
 import library  # noqa: E402
+import share  # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -89,6 +90,31 @@ def make_poster(video_path, media_dir, sha):
             return f"media/{dest.name}"
     print(f"  could not extract a poster frame from {video_path}: {r.stderr.strip()[:200]}")
     return None
+
+
+def write_embeds(out, out_media):
+    """For the viewer's Save as file: each image (scaled as share.py does) and each video's cover
+    frame as a tiny script in embed/. A page opened from a local file can load scripts but can't
+    read its own images, so this is how it builds a single-file copy without help. Files are named
+    after the media file, which is content-addressed, so unchanged ones are reused."""
+    ed = out / "embed"
+    ed.mkdir(exist_ok=True)
+    keep = set()
+    for m in out_media.values():
+        for k in ("src", "poster"):
+            rel = m.get(k)
+            if not rel or (k == "src" and m.get("kind") == "video"):
+                continue
+            f = out / rel
+            dest = ed / (Path(rel).name + ".js")
+            keep.add(dest.name)
+            if not f.exists() or (dest.exists() and dest.stat().st_mtime >= f.stat().st_mtime):
+                continue
+            uri = share.data_uri(f, False)
+            dest.write_text("(window.META_ADS_EMBED=window.META_ADS_EMBED||{})[" + json.dumps(rel) + "]=" + json.dumps(uri) + ";\n", encoding="utf-8")
+    for p in ed.glob("*.js"):
+        if p.name not in keep:
+            p.unlink()
 
 
 def first_thumb(ads, out_media):
@@ -181,11 +207,13 @@ def main():
         "placements_version": res["placements_version"],
         "generated": dt.datetime.now().isoformat(timespec="seconds"),
     }
+    write_embeds(out, out_media)
     (out / "data.js").write_text("window.META_ADS = " + json.dumps(data, ensure_ascii=False) + ";\n", encoding="utf-8")
     # Point index.html at this render's data.js with a version stamp, so a browser that cached
     # an earlier data.js (e.g. when served over http) can't show stale ads after a re-render.
     stamp = dt.datetime.now().strftime("%Y%m%d%H%M%S")
     html = VIEWER.read_text(encoding="utf-8").replace('<script src="data.js"></script>', f'<script src="data.js?v={stamp}"></script>', 1)
+    html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta name="meta-ads-embed" content="embed/">', 1)
     if lib_root:
         # Tell the viewer it's in a library, so it can load the shared library list and show the switcher.
         lib_id = spec_path.parent.name.replace('"', "")

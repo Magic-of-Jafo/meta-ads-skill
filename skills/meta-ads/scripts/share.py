@@ -135,7 +135,7 @@ def main():
     html, n = re.subn(r'<script src="data\.js(\?v=[^"]*)?"></script>', lambda _: f"<script>{payload}</script>", html, count=1)
     if not n:
         sys.exit("index.html doesn't load data.js the expected way; re-render with this skill version first")
-    html = re.sub(r'<meta name="meta-ads-library"[^>]*>\n?', "", html)        # no Library menu in a share
+    html = re.sub(r'<meta name="meta-ads-(library|embed)"[^>]*>\n?', "", html)   # no Library menu or Save in a share
     html = html.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta name="robots" content="noindex, nofollow">', 1)
     title = ((data.get("campaign") or {}).get("name") or "Ad mockups") + " (shared)"
     title = title.replace("&", "&amp;").replace("<", "&lt;")

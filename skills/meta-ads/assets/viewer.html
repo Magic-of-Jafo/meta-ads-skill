@@ -62,6 +62,15 @@ details.menu[open] > summary{border-color:var(--ui-accent)}
 .pop .expin{font:inherit;font-size:12px;padding:5px 7px;border:1px solid var(--ui-line);border-radius:6px;background:var(--ui-bg);color:var(--ui-text);width:100%;resize:vertical}
 .pop a.expf{color:var(--ui-accent);font-size:12px;overflow-wrap:anywhere}
 .pop{max-height:calc(100vh - 120px);overflow:auto}
+.selbar{background:color-mix(in srgb,var(--ui-accent) 10%,var(--ui-panel));border:1px solid color-mix(in srgb,var(--ui-accent) 40%,var(--ui-line));border-radius:8px;padding:6px 10px}
+.selbar b{font-size:13px}
+.ib.pri{background:var(--ui-accent);border-color:var(--ui-accent);color:#fff}
+.pickbox{display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;font-weight:600;color:var(--ui-text);white-space:nowrap}
+.pickbox input{width:16px;height:16px;margin:0;accent-color:var(--ui-accent);cursor:pointer}
+.tile-h .pickbox{align-self:center}
+.tile.picked > .zoomable,.tile.picked > .tile-h + .zoomable{outline:3px solid var(--ui-accent);outline-offset:3px;border-radius:4px}
+table.mx tr.picked th.ad{background:color-mix(in srgb,var(--ui-accent) 14%,var(--ui-panel))}
+table.mx th.ad .pickbox{margin-right:6px;vertical-align:-3px}
 .nbadge{background:var(--ui-accent);color:#fff;border-radius:9px;font-size:11px;font-weight:600;padding:0 6px;line-height:16px}
 .rhs{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:nowrap}
 .ib.on{background:var(--ui-text);color:var(--ui-panel);border-color:var(--ui-text)}
@@ -455,13 +464,15 @@ function loadPrefs(){
     const l = JSON.parse(localStorage.getItem(prefKey()) || "{}");
     for (const k of PREF_GLOBAL) if (k in g) state[k] = g[k];
     for (const k of PREF_LOCAL) if (k in l) state[k] = l[k];
+    if (Array.isArray(l.picked)) l.picked.forEach(id => { if (AD[id]) EXP.picked.add(id); });
+    if (["this", "shown", "pick"].includes(l.scope)) EXP.scope = l.scope;
   } catch (e) { /* storage blocked: defaults */ }
 }
 function savePrefs(){
   if (state.export) return;
   try {
     localStorage.setItem("meta-ads:prefs", JSON.stringify(Object.fromEntries(PREF_GLOBAL.map(k => [k, state[k]]))));
-    localStorage.setItem(prefKey(), JSON.stringify(Object.fromEntries(PREF_LOCAL.map(k => [k, state[k]]))));
+    localStorage.setItem(prefKey(), JSON.stringify({...Object.fromEntries(PREF_LOCAL.map(k => [k, state[k]])), picked: [...EXP.picked], scope: EXP.scope}));
   } catch (e) { /* storage blocked or full: settings just won't persist */ }
 }
 
@@ -863,8 +874,9 @@ function toolbar(){
   const opt = (k, label, help) => `<label class="opt"><input type="checkbox" data-tog="${k}" ${state[k]?"checked":""}><span>${label}</span><small>${help}</small></label>`;
   const sel = (k, label, all, items) => `<div class="fld"><span class="lb">${label}</span><select data-sel="${k}"><option value="">${all}</option>${items.map(([v, l]) => `<option value="${esc(v)}" ${v===state[k]?"selected":""}>${esc(l)}</option>`).join("")}</select></div>`;
   const chev = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>`;
+  const adCtlPick = usesAd && SELECTING && state.ad ? pickBox(state.ad, "Include") : "";
   const adCtl = usesAd
-    ? `<button class="ib" data-step="-1" title="Previous ad (← key)" aria-label="Previous ad" ${idx <= 0 ? "disabled" : ""}>‹</button><select data-sel="ad" aria-label="Ad">${adOpts}</select><button class="ib" data-step="1" title="Next ad (→ key)" aria-label="Next ad" ${idx >= adsF.length - 1 ? "disabled" : ""}>›</button><span class="cnt">${idx + 1} of ${adsF.length}</span>`
+    ? `<button class="ib" data-step="-1" title="Previous ad (← key)" aria-label="Previous ad" ${idx <= 0 ? "disabled" : ""}>‹</button><select data-sel="ad" aria-label="Ad">${adOpts}</select><button class="ib" data-step="1" title="Next ad (→ key)" aria-label="Next ad" ${idx >= adsF.length - 1 ? "disabled" : ""}>›</button><span class="cnt">${idx + 1} of ${adsF.length}</span>${adCtlPick}`
     : `<span class="fixed">All ${adsF.length} ad${adsF.length === 1 ? "" : "s"}${nFilters ? " (filtered)" : ""}</span>`;
   const plCtl = usesPl
     ? `${state.mode === "compare" ? `<button class="ib" data-plstep="-1" title="Previous placement (← key)" aria-label="Previous placement" ${plIdx <= 0 ? "disabled" : ""}>‹</button>` : ""}<select data-sel="pl" aria-label="Placement">${plGroups}</select>${state.mode === "compare" ? `<button class="ib" data-plstep="1" title="Next placement (→ key)" aria-label="Next placement" ${plIdx >= D.placements.length - 1 ? "disabled" : ""}>›</button>` : ""}`
@@ -886,18 +898,20 @@ function toolbar(){
     <p style="color:var(--ui-sub)">Keys: ← → step through ads (or placements in Compare ads).</p>`;
   $("#bar").innerHTML = `<div class="row">${libCtl()}
     <span class="seg" role="tablist">${MODES.map(([v, l, d]) => `<button data-mode="${v}" class="${state.mode===v?"on":""}" role="tab" aria-selected="${state.mode===v}">${l}<small>${d}</small></button>`).join("")}</span>
-    <span class="rhs">${D.share ? "" : menu("export", `Export ${chev}`, expBody, true)}${menu("key", `<span><span class="dot actual"></span>Actual</span><span><span class="dot simulated"></span>Simulated</span><span>What’s this?</span>`, keyBody, true)}
+    <span class="rhs">${D.share ? "" : `<button class="ib${SELECTING ? " on" : ""}" data-selmode aria-pressed="${SELECTING}" title="Tick the ads you want in a PDF, PowerPoint or file">${SELECTING ? "✓ Selecting ads" : "☐ Select ads"}</button>`}${D.share ? "" : menu("export", `Export${EXP.picked.size && EXP.scope === "pick" ? ` <span class="nbadge">${EXP.picked.size}</span>` : ""} ${chev}`, expBody, true)}${menu("key", `<span><span class="dot actual"></span>Actual</span><span><span class="dot simulated"></span>Simulated</span><span>What’s this?</span>`, keyBody, true)}
     <button class="ib${state.dark ? " on" : ""}" data-dark aria-pressed="${state.dark}" title="Dark theme for the mockups and this viewer">${state.dark ? "☀ Light mode" : "☾ Dark mode"}</button></span></div>
     <div class="row"><div class="fld"><span class="lb" style="cursor:help" title="Which ad to show. The names come from each ad’s label in your ads.json, grouped by the brand that ran it.">Ad</span>${adCtl}</div>
     <div class="fld"><span class="lb">Placement</span>${plCtl}</div>
     ${menu("filter", `Filter${nFilters ? ` <span class="nbadge">${nFilters}</span>` : ""} ${chev}`, filterBody)}
     ${menu("overlays", `Overlays ${chev}`, overlayBody)}
-    ${state.mode !== "matrix" ? `<div class="fld"><span class="lb">Zoom</span><button class="ib" data-zoomstep="-0.1" aria-label="Zoom out">−</button><span class="zoomv">${Math.round(state.zoom * 100)}%</span><button class="ib" data-zoomstep="0.1" aria-label="Zoom in">+</button></div>` : ""}</div>`;
+    ${state.mode !== "matrix" ? `<div class="fld"><span class="lb">Zoom</span><button class="ib" data-zoomstep="-0.1" aria-label="Zoom out">−</button><span class="zoomv">${Math.round(state.zoom * 100)}%</span><button class="ib" data-zoomstep="0.1" aria-label="Zoom in">+</button></div>` : ""}</div>
+    ${SELECTING ? selBar(adsF, usesAd) : ""}`;
   const bar = $("#bar");
   bar.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { state.mode = b.dataset.mode; go(); });
   bar.querySelectorAll("[data-sel]").forEach(s => s.onchange = () => { state[s.dataset.sel] = s.value; if (s.dataset.sel === "ad") state.card = 0; go(); });
   bar.querySelectorAll("[data-tog]").forEach(c => c.onchange = () => { state[c.dataset.tog] = c.checked; go(); });
   bindExport(bar, adsF);
+  bindSelect(bar, adsF);
   bar.querySelector("[data-dark]").onclick = () => { state.dark = !state.dark; go(); };
   bar.querySelectorAll("[data-step]").forEach(b => b.onclick = () => stepAd(+b.dataset.step));
   bar.querySelectorAll("[data-plstep]").forEach(b => b.onclick = () => stepPl(+b.dataset.plstep));
@@ -944,7 +958,37 @@ const EXP = {fmt: "pdf", scope: "this", layout: "concept", pls: ["fb_feed_mobile
 function expAds(adsF){
   if (EXP.scope === "this") return AD[state.ad] ? [AD[state.ad]] : [];
   if (EXP.scope === "shown") return adsF;
-  return adsF.filter(a => EXP.picked.has(a.id));
+  return ADS_BY_BRAND.filter(a => EXP.picked.has(a.id));   // all picks, even ones the Filter hides now
+}
+function selBar(adsF, usesAd){
+  const n = EXP.picked.size, hidden = [...EXP.picked].filter(id => !adsF.some(a => a.id === id)).length;
+  const allIn = adsF.length && adsF.every(a => EXP.picked.has(a.id));
+  return `<div class="row selbar"><b>${n} ad${n === 1 ? "" : "s"} selected</b>${hidden ? `<span class="cnt">(${hidden} hidden by Filter)</span>` : ""}
+    <span class="cnt">${usesAd ? "Tick Include for each ad you want, or switch to Compare ads to see them all." : "Tick the box on each ad you want in the export."}</span>
+    <span class="rhs"><button class="ib" data-selall="${allIn ? "0" : "1"}">${allIn ? "Clear shown" : `Select all ${adsF.length} shown`}</button>${n ? `<button class="ib" data-selclear>Clear all</button>` : ""}
+    <button class="ib pri" data-selexport ${n ? "" : "disabled"}>Export ${n || ""} selected…</button><button class="ib" data-selmode>Done</button></span></div>`;
+}
+function setPicked(id, on){
+  on ? EXP.picked.add(id) : EXP.picked.delete(id);
+  if (on) EXP.scope = "pick";
+  document.querySelectorAll(`#main [data-tile="${CSS.escape(id)}"]`).forEach(t => t.classList.toggle("picked", on));
+  document.querySelectorAll(`[data-pick="${CSS.escape(id)}"]`).forEach(c => { c.checked = on; });
+  savePrefs(); toolbar();
+}
+function bindSelect(bar, adsF){
+  bar.querySelectorAll("[data-selmode]").forEach(b => b.onclick = () => {
+    SELECTING = !SELECTING;
+    if (SELECTING && (state.mode === "feed" || state.mode === "gallery")) state.mode = "compare";   // every ad at once
+    if (!SELECTING && openMenu === "export") openMenu = null;
+    go();
+  });
+  const all = bar.querySelector("[data-selall]");
+  if (all) all.onclick = () => { adsF.forEach(a => all.dataset.selall === "1" ? EXP.picked.add(a.id) : EXP.picked.delete(a.id)); if (EXP.picked.size) EXP.scope = "pick"; savePrefs(); go(); };
+  const clr = bar.querySelector("[data-selclear]");
+  if (clr) clr.onclick = () => { EXP.picked.clear(); savePrefs(); go(); };
+  const ex = bar.querySelector("[data-selexport]");
+  if (ex) ex.onclick = e => { e.stopPropagation(); EXP.scope = "pick"; openMenu = "export"; toolbar(); };
+  bar.querySelectorAll("[data-pick]").forEach(c => c.onchange = () => setPicked(c.dataset.pick, c.checked));
 }
 function libFolder(){
   let p = decodeURIComponent(location.pathname).replace(/\/index\.html$/, "");
@@ -972,8 +1016,7 @@ function exportBody(adsF){
   const radio = (k, v, label, help, dis) => `<label class="opt${dis ? " dis" : ""}"><input type="radio" name="exp-${k}" data-exp="${k}" value="${v}" ${EXP[k] === v ? "checked" : ""} ${dis ? "disabled" : ""}><span>${label}</span>${help ? `<small>${help}</small>` : ""}</label>`;
   const cur = AD[state.ad];
   const brandsInView = [...new Set(adsF.map(a => a.brand))];
-  const pick = EXP.scope !== "pick" ? "" : `<div class="picklist">${brandsInView.map(b => `${brandsInView.length > 1 ? `<div class="pg">${esc((D.brands[b] || {}).page_name || b)}</div>` : ""}${adsF.filter(a => a.brand === b).map(a => `<label><input type="checkbox" data-exppick="${esc(a.id)}" ${EXP.picked.has(a.id) ? "checked" : ""}><span>${esc(adOptionText(a))}</span></label>`).join("")}`).join("")}</div>
-      <div class="fld" style="justify-content:flex-start"><button class="ib" data-exppickall="1">Select all</button><button class="ib" data-exppickall="0">Clear</button><span class="cnt">${ads.length} picked</span></div>`;
+  const pick = EXP.scope !== "pick" ? "" : `<div class="fld" style="justify-content:flex-start;margin-left:22px"><button class="ib" data-choose>${EXP.picked.size ? "Change selection" : "Choose ads"}</button><span class="cnt">${EXP.picked.size ? "" : "Tick the ads on the page."}</span></div>`;
   const deckOpts = EXP.fmt === "file" ? "" : `<p class="eh">Layout</p>
     ${radio("layout", "concept", "One slide per ad", "The ad in up to three placements, with its copy as text.")}
     ${EXP.layout === "concept" ? `<div class="fld exppls">${[0, 1, 2].map(i => `<select data-exppl="${i}" aria-label="Placement ${i + 1}">${i ? `<option value="">(none)</option>` : ""}${plOpts(EXP.pls[i])}</select>`).join("")}</div>` : ""}
@@ -983,21 +1026,94 @@ function exportBody(adsF){
     <p class="eh">Title</p><input data-exptitle class="expin" value="${esc(EXP.title)}" placeholder="${esc(D.campaign.name || "")}">`;
   const lib = (LIBS && LIBS.libraries || []).find(l => l.id === LIB_ID);
   const files = lib ? (lib.exports || (lib.shares || []).map(f => "share/" + f)) : [];
-  const req = expRequest(adsF);
+  const req = EXP.fmt === "file" ? "" : expRequest(adsF);
+  const canSave = !!LIB_EMBED;
+  const make = EXP.fmt === "file" && canSave
+    ? `<p class="eh">Save</p>
+    <p class="note" style="margin:0">Saves one .html file. Your browser asks where to put it, or puts it in Downloads. To list it on the libraries page, save it in this library’s exports folder.</p>
+    <div class="fld" style="justify-content:flex-start"><button class="ib pri" data-savefile ${ads.length ? "" : "disabled"}>Save file (${ads.length} ad${ads.length === 1 ? "" : "s"})…</button><span class="cnt" data-savemsg></span></div>`
+    : `<p class="eh">Ask Claude to make it</p>
+    <p class="note" style="margin:0">${EXP.fmt === "file" ? "This library was rendered by an older version of the skill, so it can’t save the file itself. Paste this request to Claude, or ask Claude to re-render the library." : "PDF and PowerPoint need Chrome’s screenshots and PowerPoint tools, which run on your computer through Claude. Copy this request and paste it to Claude; the file goes to this library’s exports folder."}</p>
+    <textarea data-expreq class="expin" readonly rows="4" placeholder="Pick at least one ad.">${esc(EXP.fmt === "file" ? expRequest(adsF) : req)}</textarea>
+    <div class="fld" style="justify-content:flex-start"><button class="ib" data-copy ${(EXP.fmt === "file" ? expRequest(adsF) : req) ? "" : "disabled"}>Copy request</button></div>`;
   return `<p class="eh" style="margin-top:0">Format</p>
     <span class="seg segsm">${[["file", "File (.html)"], ["pdf", "PDF"], ["pptx", "PowerPoint"]].map(([v, l]) => `<button data-expfmt="${v}" class="${EXP.fmt === v ? "on" : ""}">${l}</button>`).join("")}</span>
     <p class="note" style="margin:0">${EXP.fmt === "file" ? "One file with every mockup inside. It opens on any computer with a double-click. Videos show as still frames." : EXP.fmt === "pdf" ? "A designed slide deck: cover, your slides, and a closing note on what the mockups are." : "The same deck as an editable PowerPoint, with the full ad text in the speaker notes."}</p>
     <p class="eh">Ads</p>
     ${radio("scope", "this", "This ad", cur ? esc(clip(adOptionText(cur), 60)) : "")}
     ${radio("scope", "shown", `All ${adsF.length} ad${adsF.length === 1 ? "" : "s"} shown`, nFiltersNow() ? "As filtered by Filter." : "")}
-    ${radio("scope", "pick", "Pick ads", "")}
+    ${radio("scope", "pick", `Selected ads (${EXP.picked.size})`, EXP.picked.size ? esc(clip(ads.map(a => a.id).join(", "), 70)) : "")}
     ${pick}
     ${deckOpts}
-    <p class="eh">Ask Claude to make it</p>
-    <p class="note" style="margin:0">This page can’t create files itself. Copy this request and paste it to Claude; the file goes to this library’s exports folder.</p>
-    <textarea data-expreq class="expin" readonly rows="4" placeholder="Pick at least one ad.">${esc(req)}</textarea>
-    <div class="fld" style="justify-content:flex-start"><button class="ib" data-copy ${req ? "" : "disabled"}>Copy request</button></div>
+    ${make}
     ${files.length ? `<p class="eh">Already exported</p>${files.slice(0, 6).map(f => `<a href="../${f.split("/").map(encodeURIComponent).join("/")}" class="expf">${esc(f.split("/").pop())}</a>`).join("")}` : ""}`;
+}
+/* Save as file, in the browser. A page opened from a local file can't read its own images, so
+   render.py writes each image (scaled) and each video's cover frame as a small script in embed/,
+   which a page can always load. This mirrors share.py: same data, videos as still frames. */
+const LIB_EMBED = !!document.querySelector('meta[name="meta-ads-embed"]');
+const loadScript = src => new Promise((ok, bad) => { const s = document.createElement("script"); s.src = src; s.onload = () => { s.remove(); ok(); }; s.onerror = () => { s.remove(); bad(new Error("missing " + src)); }; document.head.appendChild(s); });
+function strings(x, out = new Set()){   // every string anywhere in x: the possible media IDs
+  if (Array.isArray(x)) x.forEach(v => strings(v, out));
+  else if (x && typeof x === "object") Object.values(x).forEach(v => strings(v, out));
+  else if (typeof x === "string") out.add(x);
+  return out;
+}
+function shareHtml(ads){
+  const keep = new Set(ads.map(a => a.id));
+  const data = JSON.parse(JSON.stringify(D));
+  delete data.share;
+  data.ads = data.ads.filter(a => keep.has(a.id));
+  data.matrix = Object.fromEntries(Object.entries(data.matrix).filter(([k]) => keep.has(k)));
+  const brands = new Set(data.ads.map(a => a.brand));
+  data.brands = Object.fromEntries(Object.entries(data.brands).filter(([k]) => brands.has(k)));
+  const used = strings([data.ads, data.brands]);
+  data.media = Object.fromEntries(Object.entries(data.media).filter(([k]) => used.has(k)));
+  const E = window.META_ADS_EMBED || {};
+  let videos = 0;
+  for (const m of Object.values(data.media)) {
+    if (m.kind === "video") { delete m.src; videos++; }
+    for (const k of ["src", "poster"]) if (m[k]) { if (E[m[k]]) m[k] = E[m[k]]; else delete m[k]; }
+  }
+  const now = new Date(), pad = n => String(n).padStart(2, "0");
+  data.share = {created: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`, videos_as_frames: videos, library: LIB_ID};
+  const payload = "window.META_ADS = " + JSON.stringify(data).replace(/<\//g, "<\\/") + ";";
+  const head = [...document.head.children].filter(el => !(el.matches('meta[name="meta-ads-library"], meta[name="meta-ads-embed"], title') || (el.tagName === "SCRIPT")))
+    .map(el => el.outerHTML).join("\n");
+  const title = esc((D.campaign.name || "Ad mockups") + " (shared)");
+  const main = [...document.body.querySelectorAll("script:not([src])")].map(s => s.textContent).join("\n");
+  return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="robots" content="noindex, nofollow">\n${head.replace('<meta charset="utf-8">', "").trim()}\n<title>${title}</title>\n</head>\n<body>\n<div id="bar"></div>\n<div id="main"></div>\n<script>${payload}</` + `script>\n<script>${main}</` + `script>\n</body>\n</html>\n`;
+}
+async function buildShareFile(ads){
+  const paths = new Set();
+  for (const id of strings([ads, ads.map(a => D.brands[a.brand])])) {
+    const m = D.media[id]; if (!m) continue;
+    if (m.poster) paths.add(m.poster);
+    if (m.src && m.kind !== "video") paths.add(m.src);
+  }
+  window.META_ADS_EMBED = window.META_ADS_EMBED || {};
+  const todo = [...paths].filter(p => !window.META_ADS_EMBED[p]);
+  for (let i = 0; i < todo.length; i += 8) await Promise.all(todo.slice(i, i + 8).map(p => loadScript("embed/" + p.split("/").pop() + ".js").catch(() => null)));
+  return shareHtml(ads);
+}
+async function saveShareFile(ads){
+  const now = new Date(), d = [now.getFullYear(), now.getMonth() + 1, now.getDate()].map(n => String(n).padStart(2, "0")).join("-");
+  const name = (D.campaign.name || "ads").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase().slice(0, 60) + (ads.length < D.ads.length ? `-${ads.length}-ads` : "") + `-${d}.html`;
+  let handle = null;
+  if (window.showSaveFilePicker) {   // ask where first: the browser only allows the dialog right after the click
+    try { handle = await showSaveFilePicker({suggestedName: name, types: [{description: "Web page", accept: {"text/html": [".html"]}}]}); }
+    catch (e) { if (e && e.name === "AbortError") throw e; /* not allowed here: download instead */ }
+  }
+  const blob = new Blob([await buildShareFile(ads)], {type: "text/html"});
+  const mb = (blob.size / 1e6).toFixed(1) + " MB";
+  if (handle) {
+    const w = await handle.createWritable(); await w.write(blob); await w.close();
+    return `Saved ${handle.name} (${mb}).`;
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  return `Downloaded ${name} (${mb}).`;
 }
 const nFiltersNow = () => (state.group ? 1 : 0) + (state.brand ? 1 : 0) + (state.status ? 1 : 0);
 function bindExport(bar, adsF){
@@ -1006,11 +1122,19 @@ function bindExport(bar, adsF){
   bar.querySelectorAll("[data-expfmt]").forEach(b => b.onclick = () => { EXP.fmt = b.dataset.expfmt; redraw(); });
   bar.querySelectorAll("input[data-exp]").forEach(r => r.onchange = () => {
     EXP[r.dataset.exp] = r.value;
-    if (r.dataset.exp === "scope" && r.value === "pick" && !EXP.picked.size && state.ad) EXP.picked.add(state.ad);
+    if (r.dataset.exp === "scope") savePrefs();
     redraw();
   });
-  bar.querySelectorAll("[data-exppick]").forEach(c => c.onchange = () => { c.checked ? EXP.picked.add(c.dataset.exppick) : EXP.picked.delete(c.dataset.exppick); redraw(); });
-  bar.querySelectorAll("[data-exppickall]").forEach(b => b.onclick = () => { if (b.dataset.exppickall === "1") adsF.forEach(a => EXP.picked.add(a.id)); else EXP.picked.clear(); redraw(); });
+  const ch = bar.querySelector("[data-choose]");
+  if (ch) ch.onclick = () => { openMenu = null; if (!SELECTING) { SELECTING = true; if (state.mode === "feed" || state.mode === "gallery") state.mode = "compare"; } go(); };
+  const sv = bar.querySelector("[data-savefile]");
+  if (sv) sv.onclick = async () => {
+    const msg = bar.querySelector("[data-savemsg]");
+    sv.disabled = true; msg.textContent = "Packing images…";
+    try { const r = await saveShareFile(expAds(adsF)); msg.textContent = r; }
+    catch (e) { msg.textContent = e && e.name === "AbortError" ? "Cancelled." : "Couldn’t save: " + (e && e.message || e); }
+    sv.disabled = false;
+  };
   bar.querySelectorAll("[data-exppl]").forEach(s => s.onchange = () => { EXP.pls[+s.dataset.exppl] = s.value; redraw(); });
   const one = bar.querySelector("[data-expone]"); if (one) one.onchange = () => { EXP.one = one.value; redraw(); };
   const ti = bar.querySelector("[data-exptitle]"); if (ti) ti.oninput = () => { EXP.title = ti.value; const r = bar.querySelector("[data-expreq]"); if (r) r.value = expRequest(adsF); };
@@ -1070,9 +1194,14 @@ function filteredAds(){   // grouped by brand (in order of first appearance), sp
 function statusOk(c){ return !state.status || c.status === state.status; }
 
 /* ------------------------------------------------------------------ views */
-function tileHtml(title, c, inner, width){
+/* Selecting ads to export: a checkbox in each tile's header (never inside the mockup itself,
+   which PNG export and the Overview thumbnails reuse). Toggling doesn't re-render the mockups. */
+let SELECTING = false;
+const pickBox = (id, label = "") => SELECTING && !state.export && !D.share ? `<label class="pickbox" title="Include this ad in the export"><input type="checkbox" data-pick="${esc(id)}" ${EXP.picked.has(id) ? "checked" : ""}>${label}</label>` : "";
+const pickedCls = id => SELECTING && EXP.picked.has(id) ? " picked" : "";
+function tileHtml(title, c, inner, width, adId){
   const reasons = [...(c.reasons||[]).map(r => `<li>${esc(r)}</li>`), ...(c.copy||[]).map(r => `<li class="copy">${esc(r)}</li>`)].join("");
-  return `<div class="tile" style="--tw:${width}px"><div class="tile-h"><b>${title}</b><span class="pill ${c.status}" title="${esc(statusTitle(c))}">${c.status.replace("_"," ")}</span></div>${reasons && state.badges ? `<ul class="reasons">${reasons}</ul>` : ""}<div class="zoomable" style="zoom:${state.zoom}">${inner}</div></div>`;
+  return `<div class="tile${adId ? pickedCls(adId) : ""}" style="--tw:${width}px"${adId ? ` data-tile="${esc(adId)}"` : ""}><div class="tile-h">${adId ? pickBox(adId) : ""}<b>${title}</b><span class="pill ${c.status}" title="${esc(statusTitle(c))}">${c.status.replace("_"," ")}</span></div>${reasons && state.badges ? `<ul class="reasons">${reasons}</ul>` : ""}<div class="zoomable" style="zoom:${state.zoom}">${inner}</div></div>`;
 }
 const widthOf = p => p.device === "desktop" ? 1280 : 393;
 function viewGallery(){
@@ -1103,8 +1232,8 @@ function viewCompare(){
     if (!statusOk(c)) return "";
     const html = mockup(ad.id, p.id);
     const title = `${esc(adName(ad))} <span class="adid">${esc(ad.id)}</span>`;
-    if (!html) return `<div class="tile"><div class="tile-h"><b>${title}</b><span class="pill ${c.status}" title="${esc(statusTitle(c))}">${c.status.replace("_"," ")}</span></div><ul class="reasons"><li>${esc(c.reasons[0]||"")}</li></ul></div>`;
-    return tileHtml(title, c, html, Math.round(widthOf(p) * state.zoom));
+    if (!html) return `<div class="tile${pickedCls(ad.id)}" data-tile="${esc(ad.id)}"><div class="tile-h">${pickBox(ad.id)}<b>${title}</b><span class="pill ${c.status}" title="${esc(statusTitle(c))}">${c.status.replace("_"," ")}</span></div><ul class="reasons"><li>${esc(c.reasons[0]||"")}</li></ul></div>`;
+    return tileHtml(title, c, html, Math.round(widthOf(p) * state.zoom), ad.id);
   });
   const shown = parts.filter(Boolean).length;
   return `<p class="summary">Every ad as it appears in <b style="color:var(--ui-text)">${esc(p.name)}</b> · ${shown} ad${shown === 1 ? "" : "s"}</p>${shown ? `<div class="tiles">${parts.join("")}</div>` : `<div class="empty">No ads match the filters here.</div>`}`;
@@ -1127,7 +1256,7 @@ function viewFeed(){
 function viewMatrix(){
   const ads = filteredAds();
   const head = `<thead><tr><th></th>${D.placements.map(p => `<th title="${esc(p.name)}">${esc(p.short)}</th>`).join("")}</tr></thead>`;
-  const rows = ads.map(ad => `<tr><th class="ad">${esc(adName(ad))}<br><span class="adid">${esc(ad.id)}</span></th>${D.placements.map(p => {
+  const rows = ads.map(ad => `<tr class="${pickedCls(ad.id).trim()}" data-tile="${esc(ad.id)}"><th class="ad">${pickBox(ad.id)}${esc(adName(ad))}<br><span class="adid">${esc(ad.id)}</span></th>${D.placements.map(p => {
     const c = cell(ad, p.id);
     const inner = state.thumbs && (c.status === "actual" || c.status === "simulated") ? `<div class="mxthumb" data-lazy="${esc(ad.id)}|${p.id}"></div>` : `<span class="dot ${c.status}"></span>`;
     return `<td title="${esc(p.name + ": " + c.status + (c.reasons.length ? " — " + c.reasons.join("; ") : ""))}" data-go="${esc(ad.id)}|${p.id}">${inner}</td>`;
@@ -1147,6 +1276,7 @@ function go(){
   clampAll(main);
   if (state.mode === "feed") revealFeedAd(main);
   if (state.mode === "matrix") {
+    main.querySelectorAll("table.mx .pickbox").forEach(l => l.onclick = e => e.stopPropagation());
     main.querySelectorAll("[data-go]").forEach(td => td.onclick = () => { const [a, p] = td.dataset.go.split("|"); state.ad = a; state.pl = p; state.mode = "compare"; state.group = AD[a].group || ""; go(); });
     const io = new IntersectionObserver(es => es.forEach(en => {
       if (!en.isIntersecting) return;
@@ -1189,8 +1319,9 @@ if ((LIB_ID || (D.share && D.share.library)) && !state.export) {
   s.onload = () => { LIBS = window.META_ADS_LIBRARIES || null; toolbar(); };
   document.head.appendChild(s);                    // missing file (library moved on its own): no switcher
 }
+$("#main").addEventListener("change", e => { const c = e.target.closest("[data-pick]"); if (c) setPicked(c.dataset.pick, c.checked); });
 document.addEventListener("click", e => {
-  if (e.target.closest("details.menu")) return;
+  if (e.target.closest("details.menu, [data-selexport]")) return;
   document.querySelectorAll("#bar details.menu[open]").forEach(d => d.open = false);
 });
 document.addEventListener("keydown", e => {

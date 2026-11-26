@@ -32,14 +32,18 @@ Ask for it in plain words: *"Start a mockup library called Acme competitors with
 
 ## Export: a file to send, a PDF or a PowerPoint
 
-The viewer's **Export** menu (top right) sets up what to export: the format, which ads (this one, all shown, or ones you pick) and, for slides, the layout. It then gives you a request to copy and paste to Claude, which makes the file in the library's `exports/` folder. The page itself can't create files. You can also just ask: *"Make a PDF deck of the three hooks in the Spring launch library."*
+To choose ads, click **Select ads** (top right). Each ad gets a checkbox; tick the ones you want, then click **Export selected**. Your selection is kept per library, even after closing the page.
 
-- **File (.html):** one file with every mockup inside it. Send it by email, Slack or Teams. The recipient downloads it and double-clicks it: no install, no account, nothing uploaded. Videos appear as their cover frame, and images are scaled to phone-mockup size. Open it in a browser, not in a web preview such as Google Drive's. Opened where it was made, it links back to the library.
+The **Export** menu sets the format, which ads (this one, all shown, or your selection) and, for slides, the layout:
+
+- **File (.html):** **Save file** saves it straight from the viewer. One file with every mockup inside it. Send it by email, Slack or Teams. The recipient downloads it and double-clicks it: no install, no account, nothing uploaded. Videos appear as their cover frame, and images are scaled to phone-mockup size. Open it in a browser, not in a web preview such as Google Drive's. Saved in the library's `exports/` folder, it's listed on the libraries page and links back to the library.
 - **PDF:** a designed 16:9 deck. A cover, then your slides, then a closing note on what the mockups are. Slide layouts:
   - **One slide per ad:** the ad in up to three placements, with its headline, text and button as real text.
   - **Side by side:** up to four ads in one placement.
   - **Brand vs brand:** two brands facing each other in one placement, for example your ads against a competitor's.
 - **PowerPoint:** the same deck as an editable `.pptx`, with the full ad text in the speaker notes. It needs the [python-pptx](https://python-pptx.readthedocs.io/en/latest/user/install.html) library.
+
+PDF and PowerPoint need headless Chrome and python-pptx on your computer, so for those the menu gives you a request to copy and paste to Claude, which makes the file in the library's `exports/` folder. You can also just ask: *"Make a PDF deck of the three hooks in the Spring launch library."*
 
 Simulated mockups are labelled on the slides. Each deck also saves a `.deck.json` file; edit its titles or slide order and ask Claude to rebuild it.
 
@@ -108,7 +112,7 @@ Everything runs locally on your machine. The plugin has no hooks, no MCP servers
 - **Python scripts** in `skills/meta-ads/scripts/`, which Claude runs when you ask for mockups:
   - `check.py` validates your `ads.json` and writes `inventory.json` and `inventory.md` next to it.
   - `render.py` copies your media into the output folder (a library's `viewer/`, or `meta-ads-output/<campaign>-<date>/` in the current folder) and writes the viewer (`index.html`, `data.js`) there. For a library it also rewrites `index.html` and `libraries.js` in the library root (`meta-ads/`).
-  - `share.py` writes a single-file copy of a viewer (images embedded, videos as cover frames) into the library's `exports/` folder. It sends nothing; you decide where the file goes.
+  - `share.py` writes a single-file copy of a viewer (images embedded, videos as cover frames) into the library's `exports/` folder. The viewer's **Save file** makes the same file in the browser, from scaled copies of the images that `render.py` writes to `viewer/embed/`. Neither sends anything; you decide where the file goes.
   - `deck.py` makes PDF and PowerPoint decks in the same `exports/` folder. It screenshots the mockups with headless Chrome or Edge, has the browser print the slides to PDF, and writes the `.pptx` with python-pptx. Working images go in `exports/.build/`.
   - `library.py` creates library folders under `meta-ads/` and rewrites that folder's `index.html` and `libraries.js`. It deletes nothing.
   - `export_png.py` saves PNGs into that folder's `png/` subfolder.
