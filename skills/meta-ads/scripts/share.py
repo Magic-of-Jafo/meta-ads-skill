@@ -150,6 +150,12 @@ def main():
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8", newline="")
     mb = out.stat().st_size / 1e6
+    if in_library and not a.out:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import library  # noqa: E402
+        root = library.root_of(src.parent / "ads.json")
+        if root:
+            library.write_index(root)
     print(f"Wrote {out}")
     print(f"  {len(data['ads'])} ads, {len(data['media'])} media embedded, {videos} video(s) as cover frames, {mb:.1f} MB")
     if mb > 20:

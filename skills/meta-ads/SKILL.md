@@ -58,6 +58,7 @@ meta-ads/
 ## What the user gets in the viewer
 
 - **Library menu** (top left, when there are two or more rendered libraries): switches library and keeps the current view and overlays. "All libraries" (shown in any library's viewer) opens the home page, which shows each library's ads, brands, counts and last update.
+- **Share menu** (top right): tells the user to ask you for a shareable file, with a prompt they can copy, and links to the library's existing share files. The home page lists them too.
 - **Views**: Feed preview (default; one ad between ordinary posts, scrollable phone or story sequence) · Compare ads (every ad in one placement, side by side) · All placements (one ad everywhere, grouped Facebook phone / Instagram / Facebook desktop) · Overview (every ad × placement grid coloured by status, optional thumbnails). ‹ › or the arrow keys step through ads; Filter narrows by group, brand or status.
 - **Overlays menu**: Stories and Reels safe areas, where text gets cut off (chars vs recommendation), why it's simulated, phone frame. Dark mode has its own button at the top right, and zoom its own − / + control. "What's this?" explains actual vs simulated.
 - Videos play, carousels swipe, "See more" expands. Every view is a URL hash, so a link to a specific view can be shared alongside the folder. Settings (view, placement, overlays, dark mode, zoom) are remembered in the browser and carry across libraries; the last ad and filters are remembered per library.

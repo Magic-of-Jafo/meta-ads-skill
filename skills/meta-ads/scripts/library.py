@@ -87,6 +87,9 @@ def scan(root):
                 lib["thumb"] = f"{d.name}/viewer/{lib['thumb']}"
         elif isinstance(spec, dict):
             lib["ads"] = len(spec.get("ads") or [])
+        share_dir = d / "share"
+        lib["shares"] = [f.name for f in sorted(share_dir.glob("*.html"), key=lambda f: f.stat().st_mtime, reverse=True)] \
+            if share_dir.is_dir() else []
         libs.append(lib)
     return libs
 

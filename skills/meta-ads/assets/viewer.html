@@ -868,13 +868,20 @@ function toolbar(){
     ${state.mode !== "feed" ? opt("frame", "Phone frame", "Shows phone placements inside a phone you can scroll.") : ""}
     ${state.mode === "matrix" ? opt("thumbs", "Thumbnails", "Small previews in the grid instead of coloured dots.") : ""}
 `;
+  const lib = (LIBS && LIBS.libraries || []).find(l => l.id === LIB_ID);
+  const shares = (lib && lib.shares) || [];
+  const askText = `Make a shareable file of the “${D.campaign.name || LIB_ID || "ad mockups"}” ${LIB_ID ? "library" : "mockups"}`;
+  const shareBody = `<p><b>Send these mockups to someone</b></p>
+    <p class="note" style="margin:0">Ask Claude for a shareable file: one .html file with every mockup inside, which opens on any computer with a double-click. Videos appear as still frames. To share only some ads, say which.</p>
+    <div class="fld"><input data-asktext readonly value="${esc(askText)}" style="flex:1;font:inherit;font-size:12px;padding:4px 6px;border:1px solid var(--ui-line);border-radius:6px;background:var(--ui-bg);color:var(--ui-text);min-width:0"><button class="ib" data-copy>Copy</button></div>
+    ${shares.length ? `<p><b>Share files already made</b></p>${shares.slice(0, 5).map(f => `<a href="../share/${encodeURIComponent(f)}" style="color:var(--ui-accent)">${esc(f)}</a>`).join("")}<p class="note" style="margin:0">They’re in this library’s share folder; send the file itself.</p>` : ""}`;
   const keyBody = `<p><span class="dot actual"></span><b>Actual</b>: the placement shows your creative as supplied, so the mockup should match what Meta shows.</p>
     <p><span class="dot simulated"></span><b>Simulated</b>: something was approximated, usually an image in the wrong shape (cropped, padded or blurred to fit) or placeholder creative. Hover a status to see why.</p>
     <p><span class="dot not_eligible"></span><b>Not eligible</b>: Meta doesn’t run this kind of ad in that placement.</p>
     <p style="color:var(--ui-sub)">Keys: ← → step through ads (or placements in Compare ads).</p>`;
   $("#bar").innerHTML = `<div class="row">${libCtl()}
     <span class="seg" role="tablist">${MODES.map(([v, l, d]) => `<button data-mode="${v}" class="${state.mode===v?"on":""}" role="tab" aria-selected="${state.mode===v}">${l}<small>${d}</small></button>`).join("")}</span>
-    <span class="rhs">${menu("key", `<span><span class="dot actual"></span>Actual</span><span><span class="dot simulated"></span>Simulated</span><span>What’s this?</span>`, keyBody, true)}
+    <span class="rhs">${D.share ? "" : menu("share", `Share ${chev}`, shareBody, true)}${menu("key", `<span><span class="dot actual"></span>Actual</span><span><span class="dot simulated"></span>Simulated</span><span>What’s this?</span>`, keyBody, true)}
     <button class="ib${state.dark ? " on" : ""}" data-dark aria-pressed="${state.dark}" title="Dark theme for the mockups and this viewer">${state.dark ? "☀ Light mode" : "☾ Dark mode"}</button></span></div>
     <div class="row"><div class="fld"><span class="lb" style="cursor:help" title="Which ad to show. The names come from each ad’s label in your ads.json, grouped by the brand that ran it.">Ad</span>${adCtl}</div>
     <div class="fld"><span class="lb">Placement</span>${plCtl}</div>
@@ -885,6 +892,12 @@ function toolbar(){
   bar.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { state.mode = b.dataset.mode; go(); });
   bar.querySelectorAll("[data-sel]").forEach(s => s.onchange = () => { state[s.dataset.sel] = s.value; if (s.dataset.sel === "ad") state.card = 0; go(); });
   bar.querySelectorAll("[data-tog]").forEach(c => c.onchange = () => { state[c.dataset.tog] = c.checked; go(); });
+  const cp = bar.querySelector("[data-copy]");
+  if (cp) cp.onclick = async () => {
+    const box = bar.querySelector("[data-asktext]");
+    try { await navigator.clipboard.writeText(box.value); } catch (e) { box.select(); document.execCommand("copy"); }
+    cp.textContent = "Copied"; setTimeout(() => { cp.textContent = "Copy"; }, 1500);
+  };
   bar.querySelector("[data-dark]").onclick = () => { state.dark = !state.dark; go(); };
   bar.querySelectorAll("[data-step]").forEach(b => b.onclick = () => stepAd(+b.dataset.step));
   bar.querySelectorAll("[data-plstep]").forEach(b => b.onclick = () => stepPl(+b.dataset.plstep));
@@ -894,7 +907,7 @@ function toolbar(){
   bar.querySelectorAll("details.menu").forEach(d => d.ontoggle = () => {
     if (d.open) {
       openMenu = d.dataset.menu; bar.querySelectorAll("details.menu[open]").forEach(o => { if (o !== d) o.open = false; });
-      const pop = d.querySelector(".pop"); pop.classList.toggle("right", d.dataset.menu === "key");
+      const pop = d.querySelector(".pop"); pop.classList.toggle("right", d.dataset.menu === "key" || d.dataset.menu === "share");
       if (pop.getBoundingClientRect().right > innerWidth - 8) pop.classList.add("right");
       if (pop.getBoundingClientRect().left < 8) pop.classList.remove("right");
     }
